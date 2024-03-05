@@ -14,13 +14,19 @@ logger = logging.getLogger(__name__)
 
 
 class Migration:
-    def __init__(self: t.Self, mig_id: str | None, path: str) -> None:
+    def __init__(self: t.Self, mig_id: str | None, path: str, applied_migrations: str[str] | None) -> None:
+        applied_migrations = applied_migrations or set()
         self.id = mig_id
         self.path = path
         self._doc: str | None = None
         self._depends: list[str] | None = None
         self._apply: t.Awaitable | None = None
         self._rollback: t.Awaitable | None = None
+        self._applied = self.id in applied_migrations
+
+    @property
+    def applied(self: t.Self) -> bool:
+        return self._applied
 
     @property
     def is_sql(self: t.Self) -> bool:

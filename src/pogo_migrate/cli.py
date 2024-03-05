@@ -6,7 +6,6 @@ import hashlib
 import importlib.metadata
 import importlib.util
 import logging
-import os
 import shlex
 import subprocess
 import sys
@@ -15,13 +14,13 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from textwrap import dedent
 
-import asyncpg
 import click
 import rtoml
 import tabulate
 import typer
 from rich.logging import RichHandler
 
+from pogo_migrate import sql
 from pogo_migrate.config import Config, load_config
 from pogo_migrate.migration import Migration
 from pogo_migrate.util import get_editor, make_file
@@ -272,10 +271,6 @@ def new(
     logger.error("Created file: %s", p)
 
 
-def read_migrations(config: Config) -> list[Migration]:
-    return [Migration(path.stem, path) for path in config.migrations.iterdir()]
-
-
 @app.command("history")
 def history(
     verbose: int = typer.Option(
@@ -290,23 +285,14 @@ def history(
     async def history_() -> None:
         setup_logging(verbose)
         config = load_config()
-        migrations = read_migrations(config)
 
         applied, unapplied = "A", "U"
-        applied_migrations = []
-        db = await asyncpg.connect(os.environ[config.database_env_key])
-
-        stmt = """
-        SELECT
-            migration_id
-        FROM _pogo_migration
-        """
-        results = await db.fetch(stmt)
-        applied_migrations = {r["migration_id"] for r in results}
-        await asyncpg.connect(os.environ[config.database_env_key])
+        db = await sql.get_connection(config)
+        await sql.ensure_pogo_sync(db)
+        migrations = sql.read_migrations(config, db)
         data = (
             (
-                applied if m.id in applied_migrations else unapplied,
+                applied if m.applied else unapplied,
                 m.id,
                 "sql" if m.is_sql else "py",
             )
@@ -315,40 +301,6 @@ def history(
         logger.error(tabulate.tabulate(data, headers=("STATUS", "ID", "FORMAT")))
 
     asyncio.run(history_())
-
-
-async def ensure_pogo_sync(db: asyncpg.Connection) -> None:
-    stmt = """
-    SELECT exists (
-        SELECT FROM pg_tables
-        WHERE  schemaname = 'public'
-        AND    tablename  = '_pogo_version'
-    );
-    """
-    r = await db.fetchrow(stmt)
-    if not r["exists"]:
-        stmt = """
-        CREATE TABLE _pogo_migration (
-            migration_hash VARCHAR(64),  -- sha256 hash of the migration id
-            migration_id VARCHAR(255),   -- The migration id (ie path basename without extension)
-            applied TIMESTAMPTZ,         -- When this id was applied
-            PRIMARY KEY (migration_hash)
-        )
-        """
-        await db.execute(stmt)
-
-        stmt = """
-        CREATE TABLE _pogo_version (
-            version INT NOT NULL PRIMARY KEY,
-            installed TIMESTAMPTZ
-        )
-        """
-        await db.execute(stmt)
-
-        stmt = """
-        INSERT INTO _pogo_version (version, installed) VALUES (0, now())
-        """
-        await db.execute(stmt)
 
 
 @app.command("apply")
@@ -365,28 +317,29 @@ def apply(
     async def apply_() -> None:
         setup_logging(verbose)
         config = load_config()
-        migrations = read_migrations(config)
 
-        db = await asyncpg.connect(os.environ[config.database_env_key])
-        # TODO(edgy): check in db for applied migrations
+        db = await sql.get_connection(config)
+        migrations = sql.read_migrations(config, db)
+
         tr = db.transaction()
         await tr.start()
-        await ensure_pogo_sync(db)
+        await sql.ensure_pogo_sync(db)
         try:
             for migration in migrations:
-                migration.load()
-                logger.error("Applying %s", migration.id)
-                await migration.apply(db)
-                stmt = """
-                INSERT INTO _pogo_migration (
-                    migration_hash,
-                    migration_id,
-                    applied
-                ) VALUES (
-                    $1, $2, now()
-                )
-                """
-                await db.execute(stmt, hashlib.sha256(migration.id.encode("utf-8")).hexdigest(), migration.id)
+                if not migration.applied:
+                    migration.load()
+                    logger.error("Applying %s", migration.id)
+                    await migration.apply(db)
+                    stmt = """
+                    INSERT INTO _pogo_migration (
+                        migration_hash,
+                        migration_id,
+                        applied
+                    ) VALUES (
+                        $1, $2, now()
+                    )
+                    """
+                    await db.execute(stmt, hashlib.sha256(migration.id.encode("utf-8")).hexdigest(), migration.id)
         except Exception as e:  # noqa: BLE001
             log = logger.exception if verbose > 1 else logger.error
             log("Error applying migration %s", migration.id)
@@ -413,23 +366,16 @@ def rollback(
     async def rollback_() -> None:
         setup_logging(verbose)
         config = load_config()
-        migrations = reversed(read_migrations(config))
 
-        db = await asyncpg.connect(os.environ[config.database_env_key])
+        db = await sql.get_connection(config)
+        migrations = reversed(sql.read_migrations(config, db))
 
-        stmt = """
-        SELECT
-            migration_id
-        FROM _pogo_migration
-        """
-        results = await db.fetch(stmt)
-        applied_migrations = {r["migration_id"] for r in results}
         tr = db.transaction()
         await tr.start()
         try:
-            await ensure_pogo_sync(db)
+            await sql.ensure_pogo_sync(db)
             for migration in migrations:
-                if migration.id in applied_migrations:
+                if migration.applied:
                     migration.load()
                     logger.error("Rolling back %s", migration.id)
                     await migration.rollback(db)
