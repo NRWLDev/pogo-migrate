@@ -1,0 +1,31 @@
+name: Check Style
+
+on:
+  push:
+    branches:
+      # Push will only build on branches that match this name
+      # Pull requests will override this, so pushes to pull requests will still build
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-style:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.11.x"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade poetry invoke
+        poetry config virtualenvs.create false
+        inv install-dev
+    - name: Check pre-commit hooks
+      run: |
+        pre-commit run --all-files
