@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import importlib.metadata
 import importlib.util
-import hashlib
 import logging
 import os
 import shlex
@@ -273,10 +273,8 @@ def new(
 
 
 def read_migrations(config: Config) -> list[Migration]:
-    return [
-        Migration(path.stem, path)
-        for path in config.migrations.iterdir()
-    ]
+    return [Migration(path.stem, path) for path in config.migrations.iterdir()]
+
 
 @app.command("history")
 def history(
@@ -317,6 +315,7 @@ def history(
         logger.error(tabulate.tabulate(data, headers=("STATUS", "ID", "FORMAT")))
 
     asyncio.run(history_())
+
 
 async def ensure_pogo_sync(db: asyncpg.Connection) -> None:
     stmt = """

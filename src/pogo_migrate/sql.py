@@ -30,14 +30,15 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
             logger.error("No '-- migrate: rollback' found.")
             raise exceptions.BadMigrationError(path) from e
         apply_statements = sqlparse.split(apply_content.strip())
+
         async def apply(db):  # noqa: ANN001, ANN202
             for statement in apply_statements:
                 await db.execute(statement)
 
         rollback_statements = sqlparse.split(rollback_content.strip())
+
         async def rollback(db):  # noqa: ANN001, ANN202
             for statement in rollback_statements:
                 await db.execute(statement)
 
         return leading_comment, apply, rollback
-

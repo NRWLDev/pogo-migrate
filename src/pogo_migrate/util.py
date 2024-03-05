@@ -33,10 +33,10 @@ def make_file(config: Config, message: str, extension: str) -> Path:
     datestr = datetime.now(tz=UTC).date().strftime("%Y%m%d")
     rand = random_string()
 
-    current = max([
-        int(p.name[len(datestr) + 1 :].split("_")[0])
-        for p in Path(config.migrations).glob(f"{datestr}_*")
-    ], default=0)
+    current = max(
+        [int(p.name[len(datestr) + 1 :].split("_")[0]) for p in Path(config.migrations).glob(f"{datestr}_*")],
+        default=0,
+    )
 
     number = str(int(current) + 1).zfill(2)
 

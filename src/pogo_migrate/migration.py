@@ -61,8 +61,7 @@ class Migration:
                 self._rollback = module.rollback
             else:
                 logger.error(
-                    "Could not import migration from %s: "
-                    "ModuleSpec has no loader attached",
+                    "Could not import migration from %s: ModuleSpec has no loader attached",
                     self.path,
                 )
                 raise exceptions.BadMigrationError(self.path)
@@ -71,4 +70,3 @@ class Migration:
     @property
     def __doc__(self: t.Self) -> str:
         return self._doc
-

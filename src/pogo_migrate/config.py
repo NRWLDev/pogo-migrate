@@ -35,4 +35,3 @@ def load_config() -> Config:
         raise typer.Exit(code=1)
 
     return Config.from_dict(data["tool"]["pogo"])
-
