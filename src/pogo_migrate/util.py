@@ -52,4 +52,3 @@ def get_editor(_config: Config) -> str:
         if editor:
             return editor
     return "vi"
-
