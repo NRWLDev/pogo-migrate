@@ -6,7 +6,7 @@ import unicodedata
 from datetime import UTC, datetime
 from pathlib import Path
 
-from pogo_migrate import Config
+from pogo_migrate.config import Config
 
 
 def unidecode(s: str) -> str:

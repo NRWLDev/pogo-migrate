@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import importlib.metadata
 import importlib.util
+import hashlib
 import logging
+import os
 import shlex
 import subprocess
 import sys
@@ -12,8 +15,10 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from textwrap import dedent
 
+import asyncpg
 import click
 import rtoml
+import tabulate
 import typer
 from rich.logging import RichHandler
 
@@ -183,7 +188,7 @@ h: show this help""")
     return ""
 
 
-def create_with_editor(config: Config, content: str, extension: str) -> Path:
+def create_with_editor(config: Config, content: str, extension: str, verbose: int) -> Path:
     editor = get_editor(config)
     tmpfile = NamedTemporaryFile(
         mode="w",
@@ -219,8 +224,9 @@ def create_with_editor(config: Config, content: str, extension: str) -> Path:
                 migration.load()
                 message = migration.__doc__
                 break
-            except Exception:
-                logger.exception("Error loading migration.")
+            except Exception:  # noqa: BLE001
+                log = logger.exception if verbose else logger.error
+                log("Error loading migration.")
                 choice = retry()
                 if choice == "n":
                     message = ""
@@ -241,7 +247,16 @@ def new(
     *,
     interactive: bool = typer.Option(True, help="Open migration for editing."),  # noqa: FBT003
     sql: bool = typer.Option(False, "--sql", help="Generate a sql migration."),  # noqa: FBT003
+    verbose: int = typer.Option(
+        0,
+        "-v",
+        "--verbose",
+        help="Verbose output. Use multiple times to increase level of verbosity.",
+        count=True,
+        max=3,
+    ),
 ) -> None:
+    setup_logging(verbose)
     config = load_config()
     template = migration_sql_template if sql else migration_template
     content = template.format(message=message, depends="")
@@ -253,20 +268,184 @@ def new(
             f.write(content)
         raise typer.Exit(code=0)
 
-    p = create_with_editor(config, content, extension)
+    p = create_with_editor(config, content, extension, verbose)
     logger.error("Created file: %s", p)
 
 
+def read_migrations(config: Config) -> list[Migration]:
+    return [
+        Migration(path.stem, path)
+        for path in config.migrations.iterdir()
+    ]
+
 @app.command("history")
-def history() -> None:
-    ...
+def history(
+    verbose: int = typer.Option(
+        0,
+        "-v",
+        "--verbose",
+        help="Verbose output. Use multiple times to increase level of verbosity.",
+        count=True,
+        max=3,
+    ),
+) -> None:
+    async def history_() -> None:
+        setup_logging(verbose)
+        config = load_config()
+        migrations = read_migrations(config)
+
+        applied, unapplied = "A", "U"
+        applied_migrations = []
+        db = await asyncpg.connect(os.environ[config.database_env_key])
+
+        stmt = """
+        SELECT
+            migration_id
+        FROM _pogo_migration
+        """
+        results = await db.fetch(stmt)
+        applied_migrations = {r["migration_id"] for r in results}
+        await asyncpg.connect(os.environ[config.database_env_key])
+        data = (
+            (
+                applied if m.id in applied_migrations else unapplied,
+                m.id,
+                "sql" if m.is_sql else "py",
+            )
+            for m in migrations
+        )
+        logger.error(tabulate.tabulate(data, headers=("STATUS", "ID", "FORMAT")))
+
+    asyncio.run(history_())
+
+async def ensure_pogo_sync(db: asyncpg.Connection) -> None:
+    stmt = """
+    SELECT exists (
+        SELECT FROM pg_tables
+        WHERE  schemaname = 'public'
+        AND    tablename  = '_pogo_version'
+    );
+    """
+    r = await db.fetchrow(stmt)
+    if not r["exists"]:
+        stmt = """
+        CREATE TABLE _pogo_migration (
+            migration_hash VARCHAR(64),  -- sha256 hash of the migration id
+            migration_id VARCHAR(255),   -- The migration id (ie path basename without extension)
+            applied TIMESTAMPTZ,         -- When this id was applied
+            PRIMARY KEY (migration_hash)
+        )
+        """
+        await db.execute(stmt)
+
+        stmt = """
+        CREATE TABLE _pogo_version (
+            version INT NOT NULL PRIMARY KEY,
+            installed TIMESTAMPTZ
+        )
+        """
+        await db.execute(stmt)
+
+        stmt = """
+        INSERT INTO _pogo_version (version, installed) VALUES (0, now())
+        """
+        await db.execute(stmt)
 
 
 @app.command("apply")
-def apply() -> None:
-    ...
+def apply(
+    verbose: int = typer.Option(
+        0,
+        "-v",
+        "--verbose",
+        help="Verbose output. Use multiple times to increase level of verbosity.",
+        count=True,
+        max=3,
+    ),
+) -> None:
+    async def apply_() -> None:
+        setup_logging(verbose)
+        config = load_config()
+        migrations = read_migrations(config)
+
+        db = await asyncpg.connect(os.environ[config.database_env_key])
+        # TODO(edgy): check in db for applied migrations
+        tr = db.transaction()
+        await tr.start()
+        await ensure_pogo_sync(db)
+        try:
+            for migration in migrations:
+                migration.load()
+                logger.error("Applying %s", migration.id)
+                await migration.apply(db)
+                stmt = """
+                INSERT INTO _pogo_migration (
+                    migration_hash,
+                    migration_id,
+                    applied
+                ) VALUES (
+                    $1, $2, now()
+                )
+                """
+                await db.execute(stmt, hashlib.sha256(migration.id.encode("utf-8")).hexdigest(), migration.id)
+        except Exception as e:  # noqa: BLE001
+            log = logger.exception if verbose > 1 else logger.error
+            log("Error applying migration %s", migration.id)
+            if verbose < 2:  # noqa: PLR2004
+                logger.warning(str(e))
+            await tr.rollback()
+        else:
+            await tr.commit()
+
+    asyncio.run(apply_())
 
 
 @app.command("rollback")
-def rollback() -> None:
-    ...
+def rollback(
+    verbose: int = typer.Option(
+        0,
+        "-v",
+        "--verbose",
+        help="Verbose output. Use multiple times to increase level of verbosity.",
+        count=True,
+        max=3,
+    ),
+) -> None:
+    async def rollback_() -> None:
+        setup_logging(verbose)
+        config = load_config()
+        migrations = reversed(read_migrations(config))
+
+        db = await asyncpg.connect(os.environ[config.database_env_key])
+
+        stmt = """
+        SELECT
+            migration_id
+        FROM _pogo_migration
+        """
+        results = await db.fetch(stmt)
+        applied_migrations = {r["migration_id"] for r in results}
+        tr = db.transaction()
+        await tr.start()
+        try:
+            await ensure_pogo_sync(db)
+            for migration in migrations:
+                if migration.id in applied_migrations:
+                    migration.load()
+                    logger.error("Rolling back %s", migration.id)
+                    await migration.rollback(db)
+                    stmt = """
+                    DELETE FROM _pogo_migration
+                    WHERE migration_id = $1
+                    """
+                    await db.execute(stmt, migration.id)
+        except Exception as e:  # noqa: BLE001
+            log = logger.exception if verbose > 1 else logger.error
+            log("Error applying migration %s", migration.id)
+            if verbose < 2:  # noqa: PLR2004
+                logger.warning(str(e))
+            await tr.rollback()
+        else:
+            await tr.commit()
+
+    asyncio.run(rollback_())

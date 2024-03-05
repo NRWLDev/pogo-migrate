@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class Migration:
     def __init__(self: t.Self, mig_id: str | None, path: str) -> None:
-        self.mig_id = mig_id
+        self.id = mig_id
         self.path = path
         self._doc: str | None = None
         self._depends: list[str] | None = None
@@ -30,9 +30,9 @@ class Migration:
         await self._apply(db)
 
     async def rollback(self: t.Self, db: asyncpg.Connection) -> None:
-        await self.rollback(db)
+        await self._rollback(db)
 
-    def load(self: t.Self) -> None:
+    def load(self: t.Self) -> Migration:
         if self.is_sql:
             leading_comment, apply, rollback = read_sql_migration(self.path)
             self._doc = leading_comment
@@ -49,9 +49,9 @@ class Migration:
             if spec and spec.loader:
                 try:
                     spec.loader.exec_module(module)
-                except Exception as e:
-                    logger.exception(
-                        "Could not import migration from %r",
+                except Exception as e:  # noqa: BLE001
+                    logger.error(
+                        "Could not import migration from %s",
                         self.path,
                     )
                     raise exceptions.BadMigrationError(self.path) from e
@@ -60,12 +60,13 @@ class Migration:
                 self._apply = module.apply
                 self._rollback = module.rollback
             else:
-                logger.exception(
-                    "Could not import migration from %r: "
+                logger.error(
+                    "Could not import migration from %s: "
                     "ModuleSpec has no loader attached",
                     self.path,
                 )
                 raise exceptions.BadMigrationError(self.path)
+        return self
 
     @property
     def __doc__(self: t.Self) -> str:
