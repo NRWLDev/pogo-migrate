@@ -92,8 +92,10 @@ addopts = "--random-order"
 [tool.ruff]
 target-version = "py39"
 line-length = 120
-lint.select = ["ALL"]
-lint.ignore = [
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
     "D",
     "FIX",
     "TD003",
