@@ -1,0 +1,137 @@
+[tool.poetry]
+name = "pogo_migrate"
+version = "0.0.0"
+description = "Database migration tool for asyncpg"
+readme = "README.md"
+homepage = "https://github.com/NRWLDev/pogo-migrate"
+authors = [
+    "Daniel Edgecombe <daniel@nrwl.co>"
+]
+maintainers = [
+    "Daniel Edgecombe <daniel@nrwl.co>",
+]
+keywords = ["migrations", "migrate", "database", "asyncpg", "yoyo"]
+license = "Apache"
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Topic :: Database",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Version Control",
+    "Programming Language :: Python :: 3",
+]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+typer = "^0.9.0"
+# sqlparse = "^0.4.4"
+# tabulate = "^0.9.0"
+# pymysql = {version = "^1.1.0", optional = true}
+# psycopg2 = {version = "^2.9.9", optional = true}
+# pyodbc = {version = "^5.1.0", optional = true}
+rich = "^13.7.1"
+rtoml = "^0.10.0"
+sqlparse = "^0.4.4"
+
+[tool.poetry.group.dev.dependencies]
+# Tests
+pytest = "^8.0.2"
+pytest-random-order = "^1.1.1"
+pytest-cov = "^4.1.0"
+
+# Style
+ruff = "^0.3.0"
+pre-commit = "^3.0.2"
+
+# Release management
+changelog-gen = {version = "^0.9.1", extras = ["bump-my-version"]}
+
+[tool.bumpversion]
+current_version = "0.0.0"
+commit = true
+tag = true
+parse = '''(?x)
+    (?P<major>0|[1-9]\d*)\.
+    (?P<minor>0|[1-9]\d*)\.
+    (?P<patch>0|[1-9]\d*)
+    (?:
+        (?P<release>rc)               # pre-release label
+        (?P<build>0|[1-9]\d*)         # pre-release version number
+    )?                                # pre-release section is optional
+'''
+serialize = [
+    "{major}.{minor}.{patch}{release}{build}",
+    "{major}.{minor}.{patch}",
+]
+parts.release.values = ["rc", "final"]
+parts.release.optional_value = "final"
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[tool.changelog_gen]
+release = true
+commit = true
+reject_empty = true
+allowed_branches = [
+    "main",
+]
+date_format = "(released %Y-%m-%d)"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--random-order"
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+lint.select = ["ALL"]
+lint.ignore = [
+    "D",
+    "FIX",
+    "TD003",
+    "TRY400",  # logger.error for user messaging on exceptions
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/pogo_migrate/cli.py" = ["UP007", "B008"]
+"tests/*" = ["SLF", "S101", "S105", "S106", "S108"]
+
+[tool.ruff.format]
+line-ending = "lf"
+quote-style = "double"
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+[tool.ruff.lint.isort]
+known-first-party = ["yoyo"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.poetry.scripts]
+pogo = "pogo_migrate.cli:app"
+
+# [tool.poetry.plugins."yoyo.backends"]
+# odbc = "yoyo.backends.contrib.odbc:ODBCBackend"
+# oracle = "yoyo.backends.contrib.oracle:OracleBackend"
+# postgres = "yoyo.backends.core.postgresql:PostgresqlBackend"
+# postgresql = "yoyo.backends.core.postgresql:PostgresqlBackend"
+# psql = "yoyo.backends.core.postgresql:PostgresqlBackend"
+# "postgresql+psycopg" = "yoyo.backends.core.postgresql:PostgresqlPsycopgBackend"
+# mysql = "yoyo.backends.core.mysql:MySQLBackend"
+# "mysql+mysqldb" = "yoyo.backends.core.mysql:MySQLdbBackend"
+# sqlite = "yoyo.backends.core.sqlite3:SQLiteBackend"
+# snowflake = "yoyo.backends.contrib.snowflake:SnowflakeBackend"
+# redshift = "yoyo.backends.contrib.redshift:RedshiftBackend"
+
+[build-system]
+requires = ["poetry-core>=1.0"]
+build-backend = "poetry.core.masonry.api"
