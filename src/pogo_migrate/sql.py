@@ -19,7 +19,11 @@ async def get_connection(connection_string: str) -> asyncpg.Connection:
 
 async def read_migrations(migrations_location: Path, db: asyncpg.Connection | None) -> list[Migration]:
     applied_migrations = await get_applied_migrations(db) if db else []
-    return [Migration(path.stem, path, applied_migrations) for path in migrations_location.iterdir()]
+    return [
+        Migration(path.stem, path, applied_migrations)
+        for path in migrations_location.iterdir()
+        if path.suffix in {".py", ".sql"}
+    ]
 
 
 async def get_applied_migrations(db: asyncpg.Connection) -> set[str]:

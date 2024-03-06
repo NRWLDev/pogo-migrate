@@ -109,6 +109,7 @@ class Migration:
                 str(self.path),
             )
             # TODO(edgy): check spec exists
+
             module = importlib.util.module_from_spec(spec)
             if spec and spec.loader:
                 try:
