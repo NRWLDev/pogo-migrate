@@ -31,9 +31,12 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
             logger.error("No '-- migrate: apply' found.")
             raise exceptions.BadMigrationError(path) from e
 
-        m = re.match(r".*-- (.*)\s-- depends:(.*)[\s]?", metadata)
+        m = re.match(r".*-- (.*)\s-- depends:(.*)[\s]?", metadata.strip())
 
-        message, depends = "", ""
+        if m is None:
+            logger.error("No '-- depends:' or message found.")
+            raise exceptions.BadMigrationError(path)
+
         if m:
             message = m[1]
             depends = m[2]
@@ -43,6 +46,7 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
         except ValueError as e:
             logger.error("No '-- migrate: rollback' found.")
             raise exceptions.BadMigrationError(path) from e
+
         apply_statements = sqlparse.split(apply_content.strip())
 
         async def apply(db):  # noqa: ANN001, ANN202

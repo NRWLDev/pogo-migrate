@@ -40,6 +40,7 @@ asyncpg = "^0.29.0"
 pytest = "^8.0.2"
 pytest-random-order = "^1.1.1"
 pytest-cov = "^4.1.0"
+pytest-env = "^0.8.1"
 
 # Style
 ruff = "^0.3.0"
@@ -47,6 +48,7 @@ pre-commit = "^3.0.2"
 
 # Release management
 changelog-gen = {version = "^0.9.1", extras = ["bump-my-version"]}
+pytest-asyncio = "^0.23.5"
 
 [tool.bumpversion]
 current_version = "0.0.2"
@@ -83,8 +85,25 @@ allowed_branches = [
 date_format = "(released %Y-%m-%d)"
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "--random-order"
+env = [
+    "D:POSTGRES_DSN=postgres://unit:password@localhost:5435/unit",
+]
+
+[tool.coverage.report]
+sort = "cover"
+fail_under = 99
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "if t.TYPE_CHECKING:",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src/pogo_migrate"]
 
 [tool.ruff]
 target-version = "py39"
@@ -103,7 +122,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tasks.py" = ["ANN", "E501", "INP001", "S"]
 "src/pogo_migrate/cli.py" = ["UP007", "B008"]
-"tests/*" = ["SLF", "S101", "S105", "S106", "S108"]
+"tests/*" = ["ANN", "D", "S105", "S106", "SLF", "DTZ005", "S101", "S608", "TD", "PLR0913"]
 
 [tool.ruff.format]
 line-ending = "lf"
@@ -113,7 +132,7 @@ quote-style = "double"
 docstring-quotes = "double"
 
 [tool.ruff.lint.isort]
-known-first-party = ["yoyo"]
+known-first-party = ["pogo_migrate"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

@@ -5,7 +5,8 @@ import logging
 from pathlib import Path
 
 import rtoml
-import typer
+
+from pogo_migrate import exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +39,14 @@ def find_config() -> Path | None:
 def load_config() -> Config:
     config = find_config()
     if config is None:
-        logger.error("No configuration found, missing %s, run 'pogo init ...'", CONFIG_FILENAME)
-        raise typer.Exit(code=1)
+        msg = f"No configuration found, missing {CONFIG_FILENAME}, run 'pogo init ...'"
+        raise exceptions.InvalidConfigurationError(msg)
 
     with config.open() as f:
         data = rtoml.load(f)
 
     if "tool" not in data or "pogo" not in data["tool"]:
-        logger.error("No configuration found, run 'pogo init ...'")
-        raise typer.Exit(code=1)
+        msg = "No configuration found, run 'pogo init ...'"
+        raise exceptions.InvalidConfigurationError(msg)
 
     return Config.from_dict(data["tool"]["pogo"])
