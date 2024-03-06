@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pogo_migrate"
-version = "0.0.1"
+version = "0.0.2rc0"
 description = "Database migration tool for asyncpg"
 readme = "README.md"
 homepage = "https://github.com/NRWLDev/pogo-migrate"
@@ -54,7 +54,7 @@ changelog-gen = {version = "^0.9.1", extras = ["bump-my-version"]}
 asyncpg = "^0.29.0"
 
 [tool.bumpversion]
-current_version = "0.0.1"
+current_version = "0.0.2rc0"
 commit = true
 tag = true
 parse = '''(?x)
