@@ -1,17 +1,15 @@
 import logging
-import os
 from pathlib import Path
 
 import asyncpg
 
-from pogo_migrate.config import Config
 from pogo_migrate.migration import Migration
 
 logger = logging.getLogger(__name__)
 
 
-async def get_connection(config: Config) -> asyncpg.Connection:
-    return await asyncpg.connect(os.environ[config.database_env_key])
+async def get_connection(connection_string: str) -> asyncpg.Connection:
+    return await asyncpg.connect(connection_string)
 
 
 async def read_migrations(migrations_location: Path, db: asyncpg.Connection) -> list[Migration]:
@@ -62,3 +60,24 @@ async def ensure_pogo_sync(db: asyncpg.Connection) -> None:
         INSERT INTO _pogo_version (version, installed) VALUES (0, now())
         """
         await db.execute(stmt)
+
+
+async def migration_applied(db: asyncpg.Connection, migration_id: str, migration_hash: str) -> None:
+    stmt = """
+    INSERT INTO _pogo_migration (
+        migration_hash,
+        migration_id,
+        applied
+    ) VALUES (
+        $1, $2, now()
+    )
+    """
+    await db.execute(stmt, migration_hash, migration_id)
+
+
+async def migration_unapplied(db: asyncpg.Connection, migration_id: str) -> None:
+    stmt = """
+    DELETE FROM _pogo_migration
+    WHERE migration_id = $1
+    """
+    await db.execute(stmt, migration_id)

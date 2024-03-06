@@ -5,6 +5,7 @@ import contextlib
 import importlib.metadata
 import importlib.util
 import logging
+import os
 import shlex
 import subprocess
 import sys
@@ -14,12 +15,13 @@ from tempfile import NamedTemporaryFile
 from textwrap import dedent
 
 import click
+import dotenv
 import rtoml
 import tabulate
 import typer
 from rich.logging import RichHandler
 
-from pogo_migrate import migrate, sql
+from pogo_migrate import migrate, sql, yoyo
 from pogo_migrate.config import Config, load_config
 from pogo_migrate.migration import Migration
 from pogo_migrate.util import get_editor, make_file
@@ -34,6 +36,13 @@ VERBOSITY = {
 }
 
 tempfile_prefix = "_tmp_pogonew"
+
+
+def load_dotenv() -> None:
+    dotenv.load_dotenv(
+        dotenv.find_dotenv(usecwd=True),
+        override=True,
+    )
 
 
 def setup_logging(verbose: int = 0) -> None:
@@ -153,6 +162,7 @@ migration_template = dedent(
         ...
     ''',
 )
+
 migration_sql_template = dedent(
     """\
     -- {message}
@@ -272,6 +282,9 @@ def new(
 
 @app.command("history")
 def history(
+    database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
+    *,
+    dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -281,12 +294,16 @@ def history(
         max=3,
     ),
 ) -> None:
+    if dotenv:
+        load_dotenv()
+
     async def history_() -> None:
         setup_logging(verbose)
         config = load_config()
 
         applied, unapplied = "A", "U"
-        db = await sql.get_connection(config)
+        connection_string = database or os.environ[config.database_env_key]
+        db = await sql.get_connection(connection_string)
         await sql.ensure_pogo_sync(db)
         migrations = await sql.read_migrations(config.migrations, db)
         data = (
@@ -304,6 +321,9 @@ def history(
 
 @app.command("apply")
 def apply(
+    database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
+    *,
+    dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -313,19 +333,38 @@ def apply(
         max=3,
     ),
 ) -> None:
+    if dotenv:
+        load_dotenv()
+
     async def apply_() -> None:
         setup_logging(verbose)
         config = load_config()
 
-        db = await sql.get_connection(config)
+        connection_string = database or os.environ[config.database_env_key]
+        db = await sql.get_connection(connection_string)
 
-        await migrate.apply(config.migrations, db)
+        try:
+            await migrate.apply(config, db)
+        except Exception:  # noqa: BLE001
+            if verbose > 1:
+                logger.exception("Error applying migrations.")
+            else:
+                logger.error("Error applying migrations.")
 
     asyncio.run(apply_())
 
 
 @app.command("rollback")
 def rollback(
+    database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
+    count: int = typer.Option(
+        1,
+        "-c",
+        "--count",
+        help="Number of migrations to rollback",
+    ),
+    *,
+    dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -335,12 +374,144 @@ def rollback(
         max=3,
     ),
 ) -> None:
+    if dotenv:
+        load_dotenv()
+    setup_logging(verbose)
+    config = load_config()
+
     async def rollback_() -> None:
-        setup_logging(verbose)
-        config = load_config()
+        connection_string = database or os.environ[config.database_env_key]
+        db = await sql.get_connection(connection_string)
 
-        db = await sql.get_connection(config)
-
-        await migrate.rollback(config.migrations, db)
+        try:
+            await migrate.rollback(config, db, count=count)
+        except Exception:  # noqa: BLE001
+            if verbose > 1:
+                logger.exception("Error rolling back migrations.")
+            else:
+                logger.error("Error rolling back migrations.")
 
     asyncio.run(rollback_())
+
+
+@app.command("mark")
+def mark(
+    database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
+    *,
+    dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
+    verbose: int = typer.Option(
+        0,
+        "-v",
+        "--verbose",
+        help="Verbose output. Use multiple times to increase level of verbosity.",
+        count=True,
+        max=3,
+    ),
+) -> None:
+    if dotenv:
+        load_dotenv()
+    setup_logging(verbose)
+    config = load_config()
+
+    async def _mark() -> None:
+        connection_string = database or os.environ[config.database_env_key]
+        db = await sql.get_connection(connection_string)
+
+        await sql.ensure_pogo_sync(db)
+        migrations = reversed(await sql.read_migrations(config.migrations, db))
+
+        with db.transaction():
+            for migration in migrations:
+                if not migration.applied:
+                    migration.load()
+                    if not typer.confirm(f"Mark {migration.id} as applied?"):
+                        break
+
+                    await sql.migration_applied(db, migration.id, migration.hash)
+
+    asyncio.run(_mark())
+
+
+@app.command("unmark")
+def unmark(
+    database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
+    *,
+    dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
+    verbose: int = typer.Option(
+        0,
+        "-v",
+        "--verbose",
+        help="Verbose output. Use multiple times to increase level of verbosity.",
+        count=True,
+        max=3,
+    ),
+) -> None:
+    if dotenv:
+        load_dotenv()
+    setup_logging(verbose)
+    config = load_config()
+
+    async def _unmark() -> None:
+        connection_string = database or os.environ[config.database_env_key]
+        db = await sql.get_connection(connection_string)
+
+        await sql.ensure_pogo_sync(db)
+        migrations = reversed(await sql.read_migrations(config.migrations, db))
+
+        with db.transaction():
+            try:
+                for migration in migrations:
+                    if migration.applied:
+                        migration.load()
+                        if not typer.confirm(f"Unmark {migration.id} as applied?"):
+                            break
+
+                        await sql.migration_unapplied(db, migration.id)
+            except Exception as e:
+                logger.warning(str(e))
+                raise
+
+    asyncio.run(_unmark())
+
+
+@app.command("migrate-yoyo")
+def migrate_yoyo(
+    database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
+    *,
+    dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
+    verbose: int = typer.Option(
+        0,
+        "-v",
+        "--verbose",
+        help="Verbose output. Use multiple times to increase level of verbosity.",
+        count=True,
+        max=3,
+    ),
+) -> None:
+    """Migrate existing 'yoyo' migrations to 'pogo'."""
+    if dotenv:
+        load_dotenv()
+    setup_logging(verbose)
+    config = load_config()
+
+    async def _migrate() -> None:
+        for path in config.migrations.iterdir():
+            if path.name.endswith(".rollback.sql"):
+                continue
+
+            if path.suffix == ".sql":
+                content = yoyo.convert_sql_migration(path)
+
+                with path.open("w") as f:
+                    f.write(content)
+                logger.error("Converted '%s' successfully.", path)
+            else:
+                logger.error("Python files can not be migrated reliably, please manually update '%s'.", path)
+
+        connection_string = database or os.environ[config.database_env_key]
+        db = await sql.get_connection(connection_string)
+
+        await sql.ensure_pogo_sync(db)
+        await yoyo.copy_yoyo_migration_history(db)
+
+    asyncio.run(_migrate())
