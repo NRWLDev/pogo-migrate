@@ -2,4 +2,7 @@
 
 ## v0.0.1 (released 2024-03-06)
 
-## v0.0.1rc0 (released 2024-03-06)
+* Support async migration support for asyncpg.
+* Support migration from existing yoyo migrations.
+* Support marking existing migrations as applied.
+* Support pyproject.toml configuration.
