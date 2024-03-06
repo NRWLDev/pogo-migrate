@@ -74,6 +74,16 @@ def tests_coverage(context):
 
 
 @invoke.task
-def release(context):
-    """Generate changelog and bump to next version."""
-    context.run("changelog generate")
+def infra_test_start(context):
+    """Run local unittest infrastructure."""
+    context.run(
+        "docker compose -f unittest-compose.yml up -d",
+    )
+
+
+@invoke.task
+def infra_test_stop(context):
+    """Stop local unittest infrastructure."""
+    context.run(
+        "docker compose -f unittest-compose.yml down",
+    )
