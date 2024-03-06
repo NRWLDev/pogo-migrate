@@ -10,6 +10,9 @@ import typer
 logger = logging.getLogger(__name__)
 
 
+CONFIG_FILENAME = "pyproject.toml"
+
+
 @dataclasses.dataclass
 class Config:
     migrations: Path
@@ -21,13 +24,24 @@ class Config:
         return cls(**data)
 
 
+def find_config() -> Path | None:
+    """Find the closest config file in the cwd or a parent directory"""
+    d = Path.cwd()
+    while d != d.parent:
+        path = d / CONFIG_FILENAME
+        if path.is_file():
+            return path
+        d = d.parent
+    return None
+
+
 def load_config() -> Config:
-    pyproject = Path("pyproject.toml")
-    if not pyproject.exists():
-        logger.error("No configuration found, missing pyproject.toml, run 'pogo init ...'")
+    config = find_config()
+    if config is None:
+        logger.error("No configuration found, missing %s, run 'pogo init ...'", CONFIG_FILENAME)
         raise typer.Exit(code=1)
 
-    with pyproject.open() as f:
+    with config.open() as f:
         data = rtoml.load(f)
 
     if "tool" not in data or "pogo" not in data["tool"]:

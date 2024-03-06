@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import hashlib
 import importlib.metadata
 import importlib.util
 import logging
@@ -20,7 +19,7 @@ import tabulate
 import typer
 from rich.logging import RichHandler
 
-from pogo_migrate import sql
+from pogo_migrate import migrate, sql
 from pogo_migrate.config import Config, load_config
 from pogo_migrate.migration import Migration
 from pogo_migrate.util import get_editor, make_file
@@ -289,7 +288,7 @@ def history(
         applied, unapplied = "A", "U"
         db = await sql.get_connection(config)
         await sql.ensure_pogo_sync(db)
-        migrations = sql.read_migrations(config, db)
+        migrations = await sql.read_migrations(config.migrations, db)
         data = (
             (
                 applied if m.applied else unapplied,
@@ -319,35 +318,8 @@ def apply(
         config = load_config()
 
         db = await sql.get_connection(config)
-        migrations = sql.read_migrations(config, db)
 
-        tr = db.transaction()
-        await tr.start()
-        await sql.ensure_pogo_sync(db)
-        try:
-            for migration in migrations:
-                if not migration.applied:
-                    migration.load()
-                    logger.error("Applying %s", migration.id)
-                    await migration.apply(db)
-                    stmt = """
-                    INSERT INTO _pogo_migration (
-                        migration_hash,
-                        migration_id,
-                        applied
-                    ) VALUES (
-                        $1, $2, now()
-                    )
-                    """
-                    await db.execute(stmt, hashlib.sha256(migration.id.encode("utf-8")).hexdigest(), migration.id)
-        except Exception as e:  # noqa: BLE001
-            log = logger.exception if verbose > 1 else logger.error
-            log("Error applying migration %s", migration.id)
-            if verbose < 2:  # noqa: PLR2004
-                logger.warning(str(e))
-            await tr.rollback()
-        else:
-            await tr.commit()
+        await migrate.apply(config.migrations, db)
 
     asyncio.run(apply_())
 
@@ -368,29 +340,7 @@ def rollback(
         config = load_config()
 
         db = await sql.get_connection(config)
-        migrations = reversed(sql.read_migrations(config, db))
 
-        tr = db.transaction()
-        await tr.start()
-        try:
-            await sql.ensure_pogo_sync(db)
-            for migration in migrations:
-                if migration.applied:
-                    migration.load()
-                    logger.error("Rolling back %s", migration.id)
-                    await migration.rollback(db)
-                    stmt = """
-                    DELETE FROM _pogo_migration
-                    WHERE migration_id = $1
-                    """
-                    await db.execute(stmt, migration.id)
-        except Exception as e:  # noqa: BLE001
-            log = logger.exception if verbose > 1 else logger.error
-            log("Error applying migration %s", migration.id)
-            if verbose < 2:  # noqa: PLR2004
-                logger.warning(str(e))
-            await tr.rollback()
-        else:
-            await tr.commit()
+        await migrate.rollback(config.migrations, db)
 
     asyncio.run(rollback_())
