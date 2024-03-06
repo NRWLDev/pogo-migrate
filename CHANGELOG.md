@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.2rc0 (released 2024-03-06)
+
+### Bug fixes
+
+- Fix issue with migrations loading non migration files in migration
+
 ## v0.0.1 (released 2024-03-06)
 
 * Support async migration support for asyncpg.
