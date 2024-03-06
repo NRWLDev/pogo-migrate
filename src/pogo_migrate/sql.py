@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 import logging
-from pathlib import Path
+import typing as t
 
 import asyncpg
 
 from pogo_migrate.migration import Migration
+
+if t.TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -12,8 +17,8 @@ async def get_connection(connection_string: str) -> asyncpg.Connection:
     return await asyncpg.connect(connection_string)
 
 
-async def read_migrations(migrations_location: Path, db: asyncpg.Connection) -> list[Migration]:
-    applied_migrations = await get_applied_migrations(db)
+async def read_migrations(migrations_location: Path, db: asyncpg.Connection | None) -> list[Migration]:
+    applied_migrations = await get_applied_migrations(db) if db else []
     return [Migration(path.stem, path, applied_migrations) for path in migrations_location.iterdir()]
 
 

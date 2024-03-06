@@ -3,7 +3,7 @@ import random
 import re
 import string
 import unicodedata
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from pogo_migrate.config import Config
@@ -30,7 +30,7 @@ def random_string() -> str:
 
 def make_file(config: Config, message: str, extension: str) -> Path:
     slug = f"-{slugify(message)}" if message else ""
-    datestr = datetime.now(tz=UTC).date().strftime("%Y%m%d")
+    datestr = datetime.now(tz=timezone.utc).date().strftime("%Y%m%d")
     rand = random_string()
 
     current = max(

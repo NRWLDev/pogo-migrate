@@ -23,7 +23,7 @@ from rich.logging import RichHandler
 
 from pogo_migrate import migrate, sql, yoyo
 from pogo_migrate.config import Config, load_config
-from pogo_migrate.migration import Migration
+from pogo_migrate.migration import Migration, topological_sort
 from pogo_migrate.util import get_editor, make_file
 
 logger = logging.getLogger(__name__)
@@ -61,6 +61,8 @@ def setup_logging(verbose: int = 0) -> None:
             ),
         ],
     )
+    asyncio_logger = logging.getLogger("asyncio")
+    asyncio_logger.disabled = True
     root_logger = logging.getLogger("")
     root_logger.setLevel(VERBOSITY.get(verbose, logging.DEBUG))
 
@@ -254,7 +256,7 @@ def new(
     message: str = typer.Option("", "-m", "--message", help="Message describing focus of the migration."),
     *,
     interactive: bool = typer.Option(True, help="Open migration for editing."),  # noqa: FBT003
-    sql: bool = typer.Option(False, "--sql", help="Generate a sql migration."),  # noqa: FBT003
+    sql_: bool = typer.Option(False, "--sql", help="Generate a sql migration."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -264,20 +266,29 @@ def new(
         max=3,
     ),
 ) -> None:
+    if dotenv:
+        load_dotenv()
     setup_logging(verbose)
     config = load_config()
-    template = migration_sql_template if sql else migration_template
-    content = template.format(message=message, depends="")
-    extension = ".sql" if sql else ".py"
 
-    if not interactive:
-        fp = make_file(config, message, extension)
-        with fp.open("w", encoding="UTF-8") as f:
-            f.write(content)
-        raise typer.Exit(code=0)
+    async def new_() -> None:
+        migrations = await sql.read_migrations(config.migrations, db=None)
+        migrations = list(topological_sort([m.load() for m in migrations]))
 
-    p = create_with_editor(config, content, extension, verbose)
-    logger.error("Created file: %s", p)
+        template = migration_sql_template if sql_ else migration_template
+        content = template.format(message=message, depends=migrations[-1].id)
+        extension = ".sql" if sql_ else ".py"
+
+        if not interactive:
+            fp = make_file(config, message, extension)
+            with fp.open("w", encoding="UTF-8") as f:
+                f.write(content)
+            raise typer.Exit(code=0)
+
+        p = create_with_editor(config, content, extension, verbose)
+        logger.error("Created file: %s", p)
+
+    asyncio.run(new_())
 
 
 @app.command("history")
@@ -296,16 +307,16 @@ def history(
 ) -> None:
     if dotenv:
         load_dotenv()
+    setup_logging(verbose)
+    config = load_config()
 
     async def history_() -> None:
-        setup_logging(verbose)
-        config = load_config()
-
         applied, unapplied = "A", "U"
         connection_string = database or os.environ[config.database_env_key]
         db = await sql.get_connection(connection_string)
         await sql.ensure_pogo_sync(db)
         migrations = await sql.read_migrations(config.migrations, db)
+        migrations = topological_sort([m.load() for m in migrations])
         data = (
             (
                 applied if m.applied else unapplied,
@@ -418,12 +429,13 @@ def mark(
         db = await sql.get_connection(connection_string)
 
         await sql.ensure_pogo_sync(db)
-        migrations = reversed(await sql.read_migrations(config.migrations, db))
+        migrations = await sql.read_migrations(config.migrations, db)
+        migrations = topological_sort([m.load() for m in migrations])
 
         with db.transaction():
             for migration in migrations:
+                migration.load()
                 if not migration.applied:
-                    migration.load()
                     if not typer.confirm(f"Mark {migration.id} as applied?"):
                         break
 
@@ -456,13 +468,14 @@ def unmark(
         db = await sql.get_connection(connection_string)
 
         await sql.ensure_pogo_sync(db)
-        migrations = reversed(await sql.read_migrations(config.migrations, db))
+        migrations = await sql.read_migrations(config.migrations, db)
+        migrations = reversed(list(topological_sort([m.load() for m in migrations])))
 
         with db.transaction():
             try:
                 for migration in migrations:
+                    migration.load()
                     if migration.applied:
-                        migration.load()
                         if not typer.confirm(f"Unmark {migration.id} as applied?"):
                             break
 
