@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -85,6 +84,6 @@ database_env_key = "POSTGRES_DSN"
     c = config.load_config()
 
     assert c == config.Config(
-        migrations=Path("./migrations"),
+        migrations=cwd / "migrations",
         database_env_key="POSTGRES_DSN",
     )

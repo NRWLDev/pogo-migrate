@@ -531,5 +531,6 @@ class TestTopologicalSort:
         accepted_orderings = [
             [m, m2, m3, m4],
             [m, m3, m4, m2],
+            [m, m3, m2, m4],
         ]
         assert migration.topological_sort(migrations) in accepted_orderings

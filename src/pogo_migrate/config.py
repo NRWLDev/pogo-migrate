@@ -20,8 +20,8 @@ class Config:
     database_env_key: str
 
     @classmethod
-    def from_dict(cls: type[Config], data: dict) -> Config:
-        data["migrations"] = Path(data["migrations"])
+    def from_dict(cls: type[Config], data: dict, root_directory: Path) -> Config:
+        data["migrations"] = root_directory / data["migrations"]
         return cls(**data)
 
 
@@ -49,4 +49,4 @@ def load_config() -> Config:
         msg = "No configuration found, run 'pogo init ...'"
         raise exceptions.InvalidConfigurationError(msg)
 
-    return Config.from_dict(data["tool"]["pogo"])
+    return Config.from_dict(data["tool"]["pogo"], config.parent)
