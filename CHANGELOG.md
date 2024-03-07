@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.4rc0 (released 2024-03-07)
+
+### Bug fixes
+
+- Clean up error handling and transaction usage in cli.
+
 ## v0.0.3 (released 2024-03-07)
 
 ### Bug fixes
