@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import hashlib
 import importlib.util
 import logging
@@ -18,6 +19,19 @@ if t.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def generate_awaitable(name: str, statements: list[str]) -> t.Awaitable:
+    func_lines = [f"async def {name}(db):"]
+    func_lines.extend([f'''    await db.execute("""{stmt}""")''' for stmt in statements] if statements else ["    ..."])
+
+    tree = ast.parse("\n".join(func_lines))
+    code = compile(tree, filename="_", mode="exec")
+    namespace = {}
+    exec(code, namespace)  # noqa: S102
+    fn = namespace[name]
+    fn.__annotations__["source"] = "\n".join(func_lines)
+    return fn
+
+
 def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
     """Read a sql migration.
 
@@ -28,36 +42,29 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
         try:
             metadata, contents = contents.split("-- migrate: apply")
         except ValueError as e:
-            logger.error("No '-- migrate: apply' found.")
-            raise exceptions.BadMigrationError(path) from e
+            msg = f"{path.name}: No '-- migrate: apply' found."
+            raise exceptions.BadMigrationError(msg) from e
 
         m = re.match(r".*-- (.*)\s-- depends:(.*)[\s]?", metadata.strip())
 
         if m is None:
-            logger.error("No '-- depends:' or message found.")
-            raise exceptions.BadMigrationError(path)
+            msg = f"{path.name}: No '-- depends:' or message found."
+            raise exceptions.BadMigrationError(msg)
 
-        if m:
-            message = m[1]
-            depends = m[2]
+        message = m[1]
+        depends = m[2]
 
         try:
             apply_content, rollback_content = contents.split("-- migrate: rollback")
         except ValueError as e:
-            logger.error("No '-- migrate: rollback' found.")
-            raise exceptions.BadMigrationError(path) from e
+            msg = f"{path.name}: No '-- migrate: rollback' found."
+            raise exceptions.BadMigrationError(msg) from e
 
         apply_statements = sqlparse.split(apply_content.strip())
-
-        async def apply(db):  # noqa: ANN001, ANN202
-            for statement in apply_statements:
-                await db.execute(statement)
+        apply = generate_awaitable("apply", apply_statements)
 
         rollback_statements = sqlparse.split(rollback_content.strip())
-
-        async def rollback(db):  # noqa: ANN001, ANN202
-            for statement in rollback_statements:
-                await db.execute(statement)
+        rollback = generate_awaitable("rollback", rollback_statements)
 
         return message, depends, apply, rollback
 
@@ -65,7 +72,7 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
 class Migration:
     __migrations: t.ClassVar[dict[str, Migration]] = {}
 
-    def __init__(self: t.Self, mig_id: str | None, path: str, applied_migrations: str[str] | None) -> None:
+    def __init__(self: t.Self, mig_id: str | None, path: str, applied_migrations: set[str] | None) -> None:
         applied_migrations = applied_migrations or set()
         self.id = mig_id
         self.path = path
@@ -82,12 +89,12 @@ class Migration:
         return self._applied
 
     @property
-    def depends(self: t.Self) -> list[str]:
+    def depends(self: t.Self) -> set[Migration]:
         return self._depends
 
     @property
-    def depends_ids(self: t.Self) -> list[str]:
-        return [m.id for m in self._depends]
+    def depends_ids(self: t.Self) -> set[str]:
+        return {m.id for m in self._depends}
 
     @property
     def is_sql(self: t.Self) -> bool:
@@ -100,7 +107,7 @@ class Migration:
         await self._rollback(db)
 
     def load(self: t.Self) -> Migration:
-        depends = []
+        depends_ = []
         if self.is_sql:
             message, depends, apply, rollback = read_sql_migration(self.path)
             self._doc = message
@@ -119,29 +126,20 @@ class Migration:
                 try:
                     spec.loader.exec_module(module)
                 except Exception as e:  # noqa: BLE001
-                    logger.error(
-                        "Could not import migration from '%s'",
-                        self.path,
-                    )
-                    raise exceptions.BadMigrationError(self.path) from e
-                self._doc = module.__doc__
+                    msg = f"Could not import migration from '{self.path.name}'"
+                    raise exceptions.BadMigrationError(msg) from e
+                self._doc = module.__doc__.strip()
                 depends_ = module.__depends__
                 self._apply = module.apply
                 self._rollback = module.rollback
             else:
-                logger.error(
-                    "Could not import migration from '%s': ModuleSpec has no loader attached",
-                    self.path,
-                )
-                raise exceptions.BadMigrationError(self.path)
+                msg = f"Could not import migration from '{self.path.name}': ModuleSpec has no loader attached"
+                raise exceptions.BadMigrationError(msg)
 
         self._depends = {self.__migrations.get(mig_id) for mig_id in depends_}
         if None in self._depends:
-            logger.error(
-                "Could not resolve dependencies for '%s'",
-                self.path,
-            )
-            raise exceptions.BadMigrationError(self.path)
+            msg = f"Could not resolve dependencies for '{self.path.name}'"
+            raise exceptions.BadMigrationError(msg)
 
         return self
 

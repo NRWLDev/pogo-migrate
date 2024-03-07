@@ -7,6 +7,18 @@ import rtoml
 import typer.testing
 
 import pogo_migrate.cli
+from pogo_migrate.migration import Migration
+
+
+@pytest.fixture(autouse=True)
+def _clear_migration_tracking():
+    # ClassVar remembers history across tests. Clear it every test.
+    try:
+        yield
+    except:  # noqa: E722, S110
+        pass
+    finally:
+        Migration._Migration__migrations = {}
 
 
 @pytest.fixture()
