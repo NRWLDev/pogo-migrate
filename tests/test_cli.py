@@ -786,9 +786,9 @@ class TestMigrateYoyo:
         cli_runner.assert_output(
             dedent(f"""\
             Converted
-            '{cwd}/migrations/20210101_02_rando-commit2.sql' successfully.
-            Converted
             '{cwd}/migrations/20210101_01_rando-commit.sql' successfully.
+            Converted
+            '{cwd}/migrations/20210101_02_rando-commit2.sql' successfully.
             """),
         )
 

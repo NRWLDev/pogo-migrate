@@ -538,7 +538,7 @@ def migrate_yoyo(
         if dotenv:  # pragma: no cover
             load_dotenv()
         config = load_config()
-        for path in config.migrations.iterdir():
+        for path in sorted(config.migrations.iterdir()):
             if path.name.endswith(".rollback.sql"):
                 continue
 
