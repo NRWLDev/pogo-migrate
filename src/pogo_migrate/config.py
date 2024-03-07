@@ -16,11 +16,13 @@ CONFIG_FILENAME = "pyproject.toml"
 
 @dataclasses.dataclass
 class Config:
+    root_directory: Path
     migrations: Path
     database_env_key: str
 
     @classmethod
     def from_dict(cls: type[Config], data: dict, root_directory: Path) -> Config:
+        data["root_directory"] = root_directory
         data["migrations"] = root_directory / data["migrations"]
         return cls(**data)
 

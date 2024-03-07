@@ -196,9 +196,8 @@ class TestNew:
 
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
-            dedent(f"""\
-            Created file:
-            {migrations}/new_file.sql
+            dedent("""\
+            Created file: migrations/new_file.sql
             """).strip(),
         )
 
@@ -289,13 +288,12 @@ class TestNew:
 
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
-            dedent(f"""\
+            dedent("""\
             Error loading migration.
             Retry editing? [Ynqh]: y
             Error loading migration.
             Retry editing? [Ynqh]: n
-            Created file:
-            {cwd}/new_file.py
+            Created file: new_file.py
             """),
         )
 
@@ -310,13 +308,12 @@ class TestNew:
 
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
-            dedent(f"""\
+            dedent("""\
             Error loading migration.
             Retry editing? [Ynqh]:
             Error loading migration.
             Retry editing? [Ynqh]: n
-            Created file:
-            {cwd}/new_file.py
+            Created file: new_file.py
             """),
         )
 
@@ -745,7 +742,7 @@ class TestUnMark:
 
 class TestMigrateYoyo:
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_sql_files_converted(self, migration_file_factory, cli_runner, db_session, cwd):
+    async def test_sql_files_converted(self, migration_file_factory, cli_runner, db_session):
         await db_session.execute("""
         create table _yoyo_migration (
             migration_hash varchar(64),
@@ -784,16 +781,14 @@ class TestMigrateYoyo:
         result = cli_runner.invoke(["migrate-yoyo"])
         assert result.exit_code == 0
         cli_runner.assert_output(
-            dedent(f"""\
-            Converted
-            '{cwd}/migrations/20210101_01_rando-commit.sql' successfully.
-            Converted
-            '{cwd}/migrations/20210101_02_rando-commit2.sql' successfully.
+            dedent("""\
+            Converted 'migrations/20210101_01_rando-commit.sql' successfully.
+            Converted 'migrations/20210101_02_rando-commit2.sql' successfully.
             """),
         )
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_py_files_skipped(self, migration_file_factory, cli_runner, db_session, cwd):
+    async def test_py_files_skipped(self, migration_file_factory, cli_runner, db_session):
         await sql.ensure_pogo_sync(db_session)
         await db_session.execute("""
         create table _yoyo_migration (
@@ -808,10 +803,10 @@ class TestMigrateYoyo:
         )
 
         result = cli_runner.invoke(["migrate-yoyo"])
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
         cli_runner.assert_output(
-            dedent(f"""\
+            dedent("""\
             Python files can not be migrated reliably, please manually update
-            '{cwd}/migrations/20210101_01_rando-commit.py'.
+            'migrations/20210101_01_rando-commit.py'.
             """),
         )
