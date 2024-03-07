@@ -68,3 +68,9 @@ class TestTopologicalSort:
 
     def test_it_doesnt_modify_order_unnecessarily(self):
         self.check("ABC", "CA", "ABC")
+
+
+# TODO(edgy): Find a home for a test with two migrations with same parent with
+# compatible/conflicting changes. See what happens.
+# TODO(edgy): Find a home for a test with a migration injected midway though
+# chain with no conflicts, does it apply happily.
