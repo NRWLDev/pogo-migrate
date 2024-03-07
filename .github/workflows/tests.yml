@@ -97,20 +97,6 @@ jobs:
   test-python-versions:
 
     runs-on: ${{ matrix.os }}
-    services:
-      postgres:
-        image: postgres:14
-        env:
-          POSTGRES_USER: unit
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: unit
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
 
     strategy:
       matrix:
@@ -118,6 +104,13 @@ jobs:
         version: ["3.9.x", "3.10.x", "3.11.x", "3.12.x"]
 
     steps:
+    - uses: ikalnytskyi/action-setup-postgres@v5
+      with:
+        username: unit
+        password: password
+        database: unit
+        port: 5432
+      id: postgres
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.version }}
       uses: actions/setup-python@v3
