@@ -1,8 +1,7 @@
-import asyncpg.exceptions
 import pytest
 
 import pogo_migrate.config
-from pogo_migrate import migrate
+from pogo_migrate import exceptions, migrate
 
 
 @pytest.fixture()
@@ -118,10 +117,11 @@ class TestApply(Base):
 
     @pytest.mark.usefixtures("_broken_apply")
     async def test_broken_migration_rollsback(self, config, db_session):
-        with pytest.raises(asyncpg.exceptions.DuplicateTableError):
+        with pytest.raises(exceptions.BadMigrationError) as e:
             await migrate.apply(config, db_session)
 
         await self.assert_tables(db_session, ["_pogo_migration", "_pogo_version"])
+        assert str(e.value) == "Failed to apply 20240318_01_12345-broken-apply"
 
 
 class TestRollback(Base):
@@ -148,10 +148,11 @@ class TestRollback(Base):
     @pytest.mark.usefixtures("_broken_rollback")
     async def test_broken_rollback_rollsback(self, config, db_session):
         await migrate.apply(config, db_session)
-        with pytest.raises(asyncpg.exceptions.UndefinedTableError):
+        with pytest.raises(exceptions.BadMigrationError) as e:
             await migrate.rollback(config, db_session, count=1)
 
         await self.assert_tables(
             db_session,
             ["_pogo_migration", "_pogo_version", "table_one", "table_three", "table_two"],
         )
+        assert str(e.value) == "Failed to rollback 20240318_01_12345-broken-rollback"
