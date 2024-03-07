@@ -46,7 +46,7 @@ jobs:
       env:
         POSTGRES_DSN: postgres://unit:password@localhost:5432/unit
       run: |
-        pytest --cov=web_error --cov-report=xml
+        pytest --cov=src/pogo_migrate --cov-report=xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
       with:
