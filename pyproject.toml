@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pogo_migrate"
-version = "0.0.4rc0"
+version = "0.0.4"
 description = "Database migration tool for asyncpg"
 readme = "README.md"
 homepage = "https://github.com/NRWLDev/pogo-migrate"
@@ -52,7 +52,7 @@ pytest-asyncio = "^0.23.5"
 nest-asyncio = "^1.6.0"
 
 [tool.bumpversion]
-current_version = "0.0.4rc0"
+current_version = "0.0.4"
 commit = true
 tag = true
 parse = '''(?x)
