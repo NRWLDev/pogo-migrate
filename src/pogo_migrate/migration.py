@@ -84,6 +84,9 @@ class Migration:
         self._applied = self.id in applied_migrations
         self.__migrations[self.id] = self
 
+    def __repr__(self: t.Self) -> str:
+        return self.id
+
     @property
     def applied(self: t.Self) -> bool:
         return self._applied
@@ -119,9 +122,10 @@ class Migration:
                 str(self.path),
                 str(self.path),
             )
-            # TODO(edgy): check spec exists
 
-            module = importlib.util.module_from_spec(spec)
+            if spec:
+                module = importlib.util.module_from_spec(spec)
+
             if spec and spec.loader:
                 try:
                     spec.loader.exec_module(module)
@@ -153,7 +157,7 @@ def topological_sort(migrations: t.Iterable[Migration]) -> t.Iterable[Migration]
     all_migrations = set(migration_list)
     dependency_graph = {m: (m.depends & all_migrations) for m in migration_list}
     try:
-        return topologicalsort.topological_sort(migration_list, dependency_graph)
+        return list(topologicalsort.topological_sort(migration_list, dependency_graph))
     except topologicalsort.CycleError as e:
         msg = "Circular dependencies among these migrations {}".format(
             ", ".join(m.id for m in e.args[1]),

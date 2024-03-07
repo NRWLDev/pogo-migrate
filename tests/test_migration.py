@@ -1,4 +1,5 @@
 import inspect
+import random
 from pathlib import Path
 from textwrap import dedent
 from unittest import mock
@@ -337,6 +338,21 @@ class TestMigration:
 
         assert str(e.value) == "Could not import migration from '20210101_01_rando-migration-message.py'"
 
+    def test_load_unsupported(self, migration_file_factory):
+        mp = migration_file_factory(
+            "20210101_01_rando-migration-message",
+            "csv",
+            "a,b,c\n1,2,3",
+        )
+        m = migration.Migration(mp.stem, mp, set())
+        with pytest.raises(exceptions.BadMigrationError) as e:
+            m.load()
+
+        assert (
+            str(e.value)
+            == "Could not import migration from '20210101_01_rando-migration-message.csv': ModuleSpec has no loader attached"  # noqa: E501
+        )
+
     def test_load_invalid_dependency(self, migration_file_factory):
         mp = migration_file_factory(
             "20210101_01_rando-migration-message",
@@ -362,5 +378,88 @@ class TestMigration:
 
 
 class TestTopologicalSort:
-    def test_migrations_sorted(self): ...
-    def test_cyclic_error(self): ...
+    def test_migrations_sorted(self, migration_file_factory):
+        mp = migration_file_factory(
+            "20210101_01_rando-migration-message",
+            "sql",
+            dedent("""
+            -- migration message
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        mp2 = migration_file_factory(
+            "20210101_02_rando-migration-message",
+            "sql",
+            dedent("""
+            -- migration message
+            -- depends: 20210101_01_rando-migration-message
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        mp3 = migration_file_factory(
+            "20210101_03_rando-migration-message",
+            "sql",
+            dedent("""
+            -- migration message
+            -- depends: 20210101_02_rando-migration-message
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        m = migration.Migration(mp.stem, mp, None)
+        m2 = migration.Migration(mp2.stem, mp2, None)
+        m3 = migration.Migration(mp3.stem, mp3, None)
+
+        migrations = [m3.load(), m2.load(), m.load()]
+        random.shuffle(migrations)
+        assert migration.topological_sort(migrations) == [m, m2, m3]
+
+    def test_cyclic_error(self, migration_file_factory):
+        mp = migration_file_factory(
+            "mig1",
+            "sql",
+            dedent("""
+            -- migration message
+            -- depends: mig3
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        mp2 = migration_file_factory(
+            "mig2",
+            "sql",
+            dedent("""
+            -- migration message
+            -- depends: mig1
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        mp3 = migration_file_factory(
+            "mig3",
+            "sql",
+            dedent("""
+            -- migration message
+            -- depends: mig2
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        m = migration.Migration(mp.stem, mp, None)
+        m2 = migration.Migration(mp2.stem, mp2, None)
+        m3 = migration.Migration(mp3.stem, mp3, None)
+
+        migrations = [m3.load(), m2.load(), m.load()]
+        with pytest.raises(exceptions.BadMigrationError) as e:
+            migration.topological_sort(migrations)
+
+        assert str(e.value) == "Circular dependencies among these migrations mig3, mig2, mig1"

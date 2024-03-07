@@ -323,7 +323,7 @@ def new(
         config = load_config()
 
         migrations = await sql.read_migrations(config.migrations, db=None)
-        migrations = list(topological_sort([m.load() for m in migrations]))
+        migrations = topological_sort([m.load() for m in migrations])
 
         template = migration_sql_template if sql_ else migration_template
         depends = migrations[-1].id if migrations else ""
@@ -507,7 +507,7 @@ def unmark(
         db = await sql.get_connection(connection_string)
 
         migrations = await sql.read_migrations(config.migrations, db)
-        migrations = reversed(list(topological_sort([m.load() for m in migrations])))
+        migrations = reversed(topological_sort([m.load() for m in migrations]))
 
         async with db.transaction():
             for migration in migrations:

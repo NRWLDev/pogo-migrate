@@ -27,7 +27,7 @@ def pyproject(pyproject_factory, migrations):  # noqa: ARG001
     return pyproject_factory()
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def _db_patch(db_session, monkeypatch):
     monkeypatch.setattr(cli.sql, "get_connection", AsyncMock(return_value=db_session))
 
@@ -384,7 +384,7 @@ class TestHistory:
             """),
         )
 
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_migrations_partial_applied(self, cli_runner, migration_file_factory, db_session):
         await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
@@ -435,7 +435,7 @@ class TestApply:
 
         assert [r["tablename"] for r in results if not r["tablename"].startswith("_pogo")] == tables
 
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_apply_success(self, cli_runner, migration_file_factory, db_session):
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -472,7 +472,7 @@ class TestApply:
         )
         await self.assert_tables(db_session, ["table_one", "table_two"])
 
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_apply_failure(self, cli_runner, migration_file_factory, db_session):
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -511,7 +511,7 @@ class TestApply:
 
         await self.assert_tables(db_session, [])
 
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     def test_apply_failure_verbose(self, cli_runner, migration_file_factory):
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -554,7 +554,7 @@ class TestRollback:
 
         assert [r["tablename"] for r in results if not r["tablename"].startswith("_pogo")] == tables
 
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_rollback_success(self, cli_runner, migration_file_factory, db_session):
         await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
@@ -595,7 +595,7 @@ class TestRollback:
         )
         await self.assert_tables(db_session, [])
 
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_rollback_failure(self, cli_runner, migration_file_factory, db_session):
         await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
@@ -626,7 +626,7 @@ class TestRollback:
 
         await self.assert_tables(db_session, ["table_one", "table_two"])
 
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_rollback_failure_verbose(self, cli_runner, migration_file_factory, db_session):
         await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
@@ -648,7 +648,7 @@ class TestRollback:
 
 
 class TestMark:
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     def test_mark_no_migrations(self, cli_runner):
         result = cli_runner.invoke(["mark"])
         assert result.exit_code == 0, result.output
@@ -657,7 +657,7 @@ class TestMark:
             "",
         )
 
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_mark_migrations_applied(self, cli_runner, migration_file_factory, db_session):
         await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
@@ -708,7 +708,7 @@ class TestMark:
 
 
 class TestUnMark:
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     def test_unmark_no_migrations(self, cli_runner):
         result = cli_runner.invoke(["unmark"])
         assert result.exit_code == 0, result.output
@@ -717,7 +717,7 @@ class TestUnMark:
             "",
         )
 
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_unmark_migrations(self, cli_runner, migration_file_factory, db_session):
         await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
@@ -769,7 +769,7 @@ class TestUnMark:
 
 
 class TestMigrateYoyo:
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_sql_files_converted(self, migration_file_factory, cli_runner, db_session):
         await db_session.execute("""
         create table _yoyo_migration (
@@ -816,8 +816,9 @@ class TestMigrateYoyo:
             """),
         )
 
-    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_py_files_skipped(self, migration_file_factory, cli_runner, db_session):
+        await sql.ensure_pogo_sync(db_session)
         await db_session.execute("""
         create table _yoyo_migration (
             migration_hash varchar(64),
