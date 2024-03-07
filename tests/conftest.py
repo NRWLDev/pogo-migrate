@@ -121,10 +121,11 @@ class CliRunner(typer.testing.CliRunner):
         clean_output = "\n".join([line.strip() for line in self.result.output.split("\n")])
         expected_lines = []
         for line in expected.strip().split("\n"):
-            if len(line) > 80:  # noqa: PLR2004
-                expected_lines.extend([line[:80], line[80:]])
-            else:
-                expected_lines.append(line)
+            line_ = line
+            while len(line_) > 80:  # noqa: PLR2004
+                expected_lines.append(line[:80])
+                line_ = line[80:]
+            expected_lines.append(line_)
         clean_expected = "\n".join(expected_lines)
         assert clean_output.strip() == clean_expected
 
