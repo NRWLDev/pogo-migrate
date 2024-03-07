@@ -17,6 +17,7 @@ async def test_apply(monkeypatch, db_session, cwd):
 
     assert testing.migrate.apply.call_args == mock.call(
         config.Config(
+            root_directory=cwd,
             migrations=cwd / "migrations",
             database_env_key="POSTGRES_DSN",
         ),
@@ -30,6 +31,7 @@ async def test_rollback(monkeypatch, db_session, cwd):
 
     assert testing.migrate.rollback.call_args == mock.call(
         config.Config(
+            root_directory=cwd,
             migrations=cwd / "migrations",
             database_env_key="POSTGRES_DSN",
         ),

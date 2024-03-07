@@ -84,6 +84,7 @@ database_env_key = "POSTGRES_DSN"
     c = config.load_config()
 
     assert c == config.Config(
+        root_directory=cwd,
         migrations=cwd / "migrations",
         database_env_key="POSTGRES_DSN",
     )
