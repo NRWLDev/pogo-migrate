@@ -9,7 +9,6 @@ import rtoml
 import typer.testing
 
 import pogo_migrate.cli
-from pogo_migrate import sql
 from pogo_migrate.migration import Migration
 
 
@@ -97,7 +96,6 @@ async def db_session(postgres_dsn):
     conn = await asyncpg.connect(postgres_dsn)
     tr = conn.transaction()
     await tr.start()
-    await sql.ensure_pogo_sync(conn)
     try:
         yield conn
     finally:

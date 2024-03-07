@@ -29,7 +29,7 @@ def pyproject(pyproject_factory, migrations):  # noqa: ARG001
 
 @pytest.fixture(autouse=True)
 def _db_patch(db_session, monkeypatch):
-    monkeypatch.setattr(cli.sql, "get_connection", AsyncMock(return_value=db_session))
+    monkeypatch.setattr(cli.sql.asyncpg, "connect", AsyncMock(return_value=db_session))
 
 
 class TestInit:
