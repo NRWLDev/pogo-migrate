@@ -318,7 +318,7 @@ def new(
 ) -> None:
     @handle_exceptions(verbose)
     async def new_() -> None:
-        if dotenv:
+        if dotenv:  # pragma: no cover
             load_dotenv()
         config = load_config()
 
@@ -360,7 +360,7 @@ def history(
 ) -> None:
     @handle_exceptions(verbose)
     async def history_() -> None:
-        if dotenv:
+        if dotenv:  # pragma: no cover
             load_dotenv()
         config = load_config()
 
@@ -399,7 +399,7 @@ def apply(
 ) -> None:
     @handle_exceptions(verbose)
     async def apply_() -> None:
-        if dotenv:
+        if dotenv:  # pragma: no cover
             load_dotenv()
         config = load_config()
 
@@ -433,7 +433,7 @@ def rollback(
 ) -> None:
     @handle_exceptions(verbose)
     async def rollback_() -> None:
-        if dotenv:
+        if dotenv:  # pragma: no cover
             load_dotenv()
         config = load_config()
 
@@ -461,7 +461,7 @@ def mark(
 ) -> None:
     @handle_exceptions(verbose)
     async def _mark() -> None:
-        if dotenv:
+        if dotenv:  # pragma: no cover
             load_dotenv()
         config = load_config()
 
@@ -499,7 +499,7 @@ def unmark(
 ) -> None:
     @handle_exceptions(verbose)
     async def _unmark() -> None:
-        if dotenv:
+        if dotenv:  # pragma: no cover
             load_dotenv()
         config = load_config()
 
@@ -539,7 +539,7 @@ def migrate_yoyo(
 
     @handle_exceptions(verbose)
     async def _migrate() -> None:
-        if dotenv:
+        if dotenv:  # pragma: no cover
             load_dotenv()
         config = load_config()
         for path in config.migrations.iterdir():

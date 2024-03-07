@@ -512,7 +512,7 @@ class TestApply:
         await self.assert_tables(db_session, [])
 
     @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
-    async def test_apply_failure_verbose(self, cli_runner, migration_file_factory):
+    def test_apply_failure_verbose(self, cli_runner, migration_file_factory):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -649,6 +649,15 @@ class TestRollback:
 
 class TestMark:
     @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    def test_mark_no_migrations(self, cli_runner):
+        result = cli_runner.invoke(["mark"])
+        assert result.exit_code == 0, result.output
+        assert_output(
+            result.output,
+            "",
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
     async def test_mark_migrations_applied(self, cli_runner, migration_file_factory, db_session):
         await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
@@ -700,6 +709,15 @@ class TestMark:
 
 class TestUnMark:
     @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    def test_unmark_no_migrations(self, cli_runner):
+        result = cli_runner.invoke(["unmark"])
+        assert result.exit_code == 0, result.output
+        assert_output(
+            result.output,
+            "",
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
     async def test_unmark_migrations(self, cli_runner, migration_file_factory, db_session):
         await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
@@ -748,3 +766,76 @@ class TestUnMark:
         )
         applied_migrations = await sql.get_applied_migrations(db_session)
         assert applied_migrations == {"20210101_01_rando-commit"}
+
+
+class TestMigrateYoyo:
+    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    async def test_sql_files_converted(self, migration_file_factory, cli_runner, db_session):
+        await db_session.execute("""
+        create table _yoyo_migration (
+            migration_hash varchar(64),
+            migration_id varchar(255),
+            applied_at_utc timestamp
+        );""")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            CREATE TABLE table_one();
+            """),
+        )
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "rollback.sql",
+            dedent("""
+            -- commit
+            -- depends:
+            DROP TABLE table_one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit2",
+            "sql",
+            dedent("""
+            -- commit2
+            -- depends: 20210101_01_rando-commit
+            CREATE TABLE table_two()
+            """),
+        )
+
+        result = cli_runner.invoke(["migrate-yoyo"])
+        assert result.exit_code == 0
+        assert_output(
+            result.output,
+            dedent("""\
+            Converted 'migrations/20210101_02_rando-commit2.sql' successfully.
+            Converted 'migrations/20210101_01_rando-commit.sql' successfully.
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject", "_db_patch")
+    async def test_py_files_skipped(self, migration_file_factory, cli_runner, db_session):
+        await db_session.execute("""
+        create table _yoyo_migration (
+            migration_hash varchar(64),
+            migration_id varchar(255),
+            applied_at_utc timestamp
+        );""")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "py",
+            "ignored",
+        )
+
+        result = cli_runner.invoke(["migrate-yoyo"])
+        assert result.exit_code == 0
+        assert_output(
+            result.output,
+            dedent("""\
+            Python files can not be migrated reliably, please manually update
+            'migrations/20210101_01_rando-commit.py'.
+            """),
+        )

@@ -98,7 +98,7 @@ env = [
 
 [tool.coverage.report]
 sort = "cover"
-fail_under = 90
+fail_under = 95
 show_missing = true
 skip_covered = true
 exclude_lines = [
