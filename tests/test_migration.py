@@ -463,3 +463,62 @@ class TestTopologicalSort:
             migration.topological_sort(migrations)
 
         assert str(e.value) == "Circular dependencies among these migrations mig3, mig2, mig1"
+
+    def test_fork(self, migration_file_factory):
+        mp = migration_file_factory(
+            "mig1",
+            "sql",
+            dedent("""
+            -- migration message
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        mp2 = migration_file_factory(
+            "mig2",
+            "sql",
+            dedent("""
+            -- migration message
+            -- depends: mig1
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        mp3 = migration_file_factory(
+            "mig3",
+            "sql",
+            dedent("""
+            -- migration message
+            -- depends: mig1
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        mp4 = migration_file_factory(
+            "mig4",
+            "sql",
+            dedent("""
+            -- migration message
+            -- depends: mig3
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        m = migration.Migration(mp.stem, mp, None)
+        m2 = migration.Migration(mp2.stem, mp2, None)
+        m3 = migration.Migration(mp3.stem, mp3, None)
+        m4 = migration.Migration(mp4.stem, mp4, None)
+
+        migrations = [m4.load(), m3.load(), m2.load(), m.load()]
+        random.shuffle(migrations)
+        # 2 and 3 can come after 1, but 4 always follows 3
+        accepted_orderings = [
+            [m, m2, m3, m4],
+            [m, m3, m4, m2],
+        ]
+        assert migration.topological_sort(migrations) in accepted_orderings
