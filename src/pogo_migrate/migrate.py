@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import typing as t
 
-from pogo_migrate import sql
+from pogo_migrate import exceptions, sql
 from pogo_migrate.migration import topological_sort
 
 if t.TYPE_CHECKING:
@@ -27,9 +27,10 @@ async def apply(config: Config, db: asyncpg.Connection) -> None:
                     logger.error("Applying %s", migration.id)
                     await migration.apply(db)
                     await sql.migration_applied(db, migration.id, migration.hash)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(str(e))
-            raise
+            msg = f"Failed to apply {migration.id}"
+            raise exceptions.BadMigrationError(msg) from e
 
 
 async def rollback(config: Config, db: asyncpg.Connection, count: int | None = None) -> None:
@@ -47,6 +48,7 @@ async def rollback(config: Config, db: asyncpg.Connection, count: int | None = N
                     await migration.rollback(db)
                     await sql.migration_unapplied(db, migration.id)
                     i += 1
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(str(e))
-            raise
+            msg = f"Failed to rollback {migration.id}"
+            raise exceptions.BadMigrationError(msg) from e
