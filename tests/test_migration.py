@@ -9,18 +9,6 @@ from pogo_migrate import exceptions, migration
 from tests.util import AsyncMock
 
 
-@pytest.fixture()
-def migration_file_factory(migrations):
-    def factory(mig_id, format_, contents):
-        p = migrations / f"{mig_id}.{format_}"
-        with p.open("w") as f:
-            f.write(contents)
-
-        return p
-
-    return factory
-
-
 class TestReadSqlMigration:
     def test_no_apply_section(self, migration_file_factory):
         mp = migration_file_factory(
@@ -90,7 +78,7 @@ class TestReadSqlMigration:
             "20210101_01_rando-migration-message",
             "sql",
             dedent("""
-            -- migration message
+            --
             -- depends:
 
             -- migrate: apply

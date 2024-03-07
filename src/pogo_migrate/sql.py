@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 async def get_connection(connection_string: str) -> asyncpg.Connection:
-    return await asyncpg.connect(connection_string)
+    db = await asyncpg.connect(connection_string)
+    await ensure_pogo_sync(db)
+    return db
 
 
 async def read_migrations(migrations_location: Path, db: asyncpg.Connection | None) -> list[Migration]:

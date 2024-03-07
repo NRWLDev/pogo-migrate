@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import importlib.metadata
 import importlib.util
 import logging
@@ -69,13 +70,13 @@ def setup_logging(verbose: int = 0) -> None:
 
 def _version_callback(*, value: bool) -> None:
     """Get current cli version."""
-    if value:
+    if value:  # pragma: no cover
         version = importlib.metadata.version("pogo-migrate")
         typer.echo(f"pogo-migrate {version}")
         raise typer.Exit
 
 
-def _callback(
+def _callback(  # pragma: no cover
     _version: t.Optional[bool] = typer.Option(
         None,
         "-v",
@@ -87,6 +88,49 @@ def _callback(
 
 
 app = typer.Typer(name="pogo", callback=_callback)
+
+
+P = t.ParamSpec("P")
+R = t.TypeVar("R")
+
+
+def handle_exceptions(verbose: int):  # noqa: ANN201
+    setup_logging(verbose)
+
+    def inner(f: t.Callable[P, t.Awaitable[R]]) -> t.Callable[P, t.Awaitable[R]]:
+        """Decorator to handle exceptions from migrations."""
+
+        @functools.wraps(f)
+        async def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
+            """Wrapped function.
+
+            Args:
+            ----
+                *args: The function args.
+                **kwargs: The function kwargs.
+
+            Returns:
+            -------
+                The function result.
+
+            Raises:
+            ------
+                PostgresConnectionError: If the connection to postgres fails.
+                UnexpectedPostgresError: If an unexpected error occurs.
+
+            """
+            try:
+                return await f(*args, **kwargs)
+            except typer.Exit:
+                raise
+            except Exception as e:  # noqa: BLE001
+                log = logger.exception if verbose else logger.error
+                log(str(e))
+                raise typer.Exit(code=1) from e
+
+        return wrapped
+
+    return inner
 
 
 @app.command("init")
@@ -107,44 +151,48 @@ def init(
     Create a migrations folder, and inject pogo configuration into
     pyproject.toml.
     """
-    setup_logging(verbose)
-    pyproject = Path("pyproject.toml")
-    if not pyproject.exists():
-        pyproject.touch()
 
-    with pyproject.open() as f:
-        data = rtoml.load(f)
+    @handle_exceptions(verbose)
+    async def init_() -> None:
+        pyproject = Path("pyproject.toml")
+        if not pyproject.exists():
+            pyproject.touch()
 
-    if "tool" in data and "pogo" in data["tool"]:
-        logger.error("pogo already configured.")
-        logger.warning("\n".join(["", "[tool.pogo]"] + [f'{k} = "{v}"' for k, v in data["tool"]["pogo"].items()]))
-        raise typer.Exit(code=1)
+        with pyproject.open() as f:  # noqa: ASYNC101
+            data = rtoml.load(f)
 
-    cwd = Path.cwd().absolute()
-    p = Path(migrations_location).resolve().absolute()
+        if "tool" in data and "pogo" in data["tool"]:
+            logger.error("pogo already configured.")
+            logger.warning("\n".join(["", "[tool.pogo]"] + [f'{k} = "{v}"' for k, v in data["tool"]["pogo"].items()]))
+            raise typer.Exit(code=1)
 
-    try:
-        loc = p.relative_to(cwd)
-    except ValueError as e:
-        logger.error("migrations_location is not a child of current location.")
-        raise typer.Exit(code=1) from e
+        cwd = Path.cwd().absolute()
+        p = Path(migrations_location).resolve().absolute()
 
-    data = {
-        "tool": {
-            "pogo": {
-                "migrations": f"./{loc}",
-                "database_env_key": database_env_key,
+        try:
+            loc = p.relative_to(cwd)
+        except ValueError as e:
+            logger.error("migrations_location is not a child of current location.")
+            raise typer.Exit(code=1) from e
+
+        data = {
+            "tool": {
+                "pogo": {
+                    "migrations": f"./{loc}",
+                    "database_env_key": database_env_key,
+                },
             },
-        },
-    }
+        }
 
-    config = rtoml.dumps(data, pretty=True)
-    logger.error(config)
-    if typer.confirm(f"Write configuration to {pyproject.absolute()}"):
-        loc.mkdir(exist_ok=True, parents=True)
-        with pyproject.open("a") as f:
-            f.write("\n")
-            f.write(config)
+        config = rtoml.dumps(data, pretty=True)
+        logger.error(config)
+        if typer.confirm(f"Write configuration to {pyproject.absolute()}"):
+            loc.mkdir(exist_ok=True, parents=True)
+            with pyproject.open("a") as f:  # noqa: ASYNC101
+                f.write("\n")
+                f.write(config)
+
+    asyncio.run(init_())
 
 
 migration_template = dedent(
@@ -167,8 +215,8 @@ migration_template = dedent(
 
 migration_sql_template = dedent(
     """\
-    -- {message}
-    -- depends: {depends}
+    --{message}
+    -- depends:{depends}
 
     -- migrate: apply
 
@@ -181,21 +229,22 @@ migration_sql_template = dedent(
 def retry() -> str:
     choice = ""
     while choice == "":
-        choice = typer.prompt("Retry editing? [Ynqh]", default="y")
+        choice = typer.prompt("Retry editing? [Ynqh]", default="y", show_default=False)
         if choice == "q":
             raise typer.Exit(code=0)
         if choice in "yn":
             return choice
         if choice == "h":
-            logger.error("""
+            logger.error("""\
 y: reopen the migration file in your editor
 n: save the migration as-is, without re-editing
 q: quit without saving the migration
-h: show this help""")
+h: show this help
+""")
         choice = ""
 
-    # Shouldn't be reachable
-    return ""
+    # Unreachable
+    return ""  # pragma: no cover
 
 
 def create_with_editor(config: Config, content: str, extension: str, verbose: int) -> Path:
@@ -222,15 +271,16 @@ def create_with_editor(config: Config, content: str, extension: str, verbose: in
         while True:
             try:
                 subprocess.call(editor)  # noqa: S603
-            except OSError:
+            except OSError as e:
                 logger.error("Error: could not open editor!")
+                raise typer.Exit(code=1) from e
             else:
                 if Path(tmpfile.name).lstat().st_mtime == mtime:
                     logger.error("Abort: no changes made")
                     raise typer.Exit(code=1)
 
             try:
-                migration = Migration(None, Path(tmpfile.name))
+                migration = Migration(None, Path(tmpfile.name), None)
                 migration.load()
                 message = migration.__doc__
                 break
@@ -253,7 +303,7 @@ def create_with_editor(config: Config, content: str, extension: str, verbose: in
 
 @app.command("new")
 def new(
-    message: str = typer.Option("", "-m", "--message", help="Message describing focus of the migration."),
+    message_: str = typer.Option("", "-m", "--message", help="Message describing focus of the migration."),
     *,
     interactive: bool = typer.Option(True, help="Open migration for editing."),  # noqa: FBT003
     sql_: bool = typer.Option(False, "--sql", help="Generate a sql migration."),  # noqa: FBT003
@@ -266,17 +316,20 @@ def new(
         max=3,
     ),
 ) -> None:
-    if dotenv:
-        load_dotenv()
-    setup_logging(verbose)
-    config = load_config()
-
+    @handle_exceptions(verbose)
     async def new_() -> None:
+        if dotenv:
+            load_dotenv()
+        config = load_config()
+
         migrations = await sql.read_migrations(config.migrations, db=None)
         migrations = list(topological_sort([m.load() for m in migrations]))
 
         template = migration_sql_template if sql_ else migration_template
-        content = template.format(message=message, depends=migrations[-1].id)
+        depends = migrations[-1].id if migrations else ""
+        depends = f" {depends}" if sql_ and depends else depends
+        message = f" {message_}" if sql_ and message_ else message_
+        content = template.format(message=message, depends=depends)
         extension = ".sql" if sql_ else ".py"
 
         if not interactive:
@@ -305,21 +358,21 @@ def history(
         max=3,
     ),
 ) -> None:
-    if dotenv:
-        load_dotenv()
-    setup_logging(verbose)
-    config = load_config()
-
+    @handle_exceptions(verbose)
     async def history_() -> None:
-        applied, unapplied = "A", "U"
+        if dotenv:
+            load_dotenv()
+        config = load_config()
+
         connection_string = database or os.environ[config.database_env_key]
         db = await sql.get_connection(connection_string)
-        await sql.ensure_pogo_sync(db)
+
         migrations = await sql.read_migrations(config.migrations, db)
         migrations = topological_sort([m.load() for m in migrations])
+
         data = (
             (
-                applied if m.applied else unapplied,
+                "A" if m.applied else "U",
                 m.id,
                 "sql" if m.is_sql else "py",
             )
@@ -344,23 +397,16 @@ def apply(
         max=3,
     ),
 ) -> None:
-    if dotenv:
-        load_dotenv()
-
+    @handle_exceptions(verbose)
     async def apply_() -> None:
-        setup_logging(verbose)
+        if dotenv:
+            load_dotenv()
         config = load_config()
 
         connection_string = database or os.environ[config.database_env_key]
         db = await sql.get_connection(connection_string)
 
-        try:
-            await migrate.apply(config, db)
-        except Exception:  # noqa: BLE001
-            if verbose > 1:
-                logger.exception("Error applying migrations.")
-            else:
-                logger.error("Error applying migrations.")
+        await migrate.apply(config, db)
 
     asyncio.run(apply_())
 
@@ -385,22 +431,16 @@ def rollback(
         max=3,
     ),
 ) -> None:
-    if dotenv:
-        load_dotenv()
-    setup_logging(verbose)
-    config = load_config()
-
+    @handle_exceptions(verbose)
     async def rollback_() -> None:
+        if dotenv:
+            load_dotenv()
+        config = load_config()
+
         connection_string = database or os.environ[config.database_env_key]
         db = await sql.get_connection(connection_string)
 
-        try:
-            await migrate.rollback(config, db, count=count)
-        except Exception:  # noqa: BLE001
-            if verbose > 1:
-                logger.exception("Error rolling back migrations.")
-            else:
-                logger.error("Error rolling back migrations.")
+        await migrate.rollback(config, db, count=count if count > 0 else None)
 
     asyncio.run(rollback_())
 
@@ -419,20 +459,19 @@ def mark(
         max=3,
     ),
 ) -> None:
-    if dotenv:
-        load_dotenv()
-    setup_logging(verbose)
-    config = load_config()
-
+    @handle_exceptions(verbose)
     async def _mark() -> None:
+        if dotenv:
+            load_dotenv()
+        config = load_config()
+
         connection_string = database or os.environ[config.database_env_key]
         db = await sql.get_connection(connection_string)
 
-        await sql.ensure_pogo_sync(db)
         migrations = await sql.read_migrations(config.migrations, db)
         migrations = topological_sort([m.load() for m in migrations])
 
-        with db.transaction():
+        async with db.transaction():
             for migration in migrations:
                 migration.load()
                 if not migration.applied:
@@ -458,31 +497,26 @@ def unmark(
         max=3,
     ),
 ) -> None:
-    if dotenv:
-        load_dotenv()
-    setup_logging(verbose)
-    config = load_config()
-
+    @handle_exceptions(verbose)
     async def _unmark() -> None:
+        if dotenv:
+            load_dotenv()
+        config = load_config()
+
         connection_string = database or os.environ[config.database_env_key]
         db = await sql.get_connection(connection_string)
 
-        await sql.ensure_pogo_sync(db)
         migrations = await sql.read_migrations(config.migrations, db)
         migrations = reversed(list(topological_sort([m.load() for m in migrations])))
 
-        with db.transaction():
-            try:
-                for migration in migrations:
-                    migration.load()
-                    if migration.applied:
-                        if not typer.confirm(f"Unmark {migration.id} as applied?"):
-                            break
+        async with db.transaction():
+            for migration in migrations:
+                migration.load()
+                if migration.applied:
+                    if not typer.confirm(f"Unmark {migration.id} as applied?"):
+                        break
 
-                        await sql.migration_unapplied(db, migration.id)
-            except Exception as e:
-                logger.warning(str(e))
-                raise
+                    await sql.migration_unapplied(db, migration.id)
 
     asyncio.run(_unmark())
 
@@ -502,12 +536,12 @@ def migrate_yoyo(
     ),
 ) -> None:
     """Migrate existing 'yoyo' migrations to 'pogo'."""
-    if dotenv:
-        load_dotenv()
-    setup_logging(verbose)
-    config = load_config()
 
+    @handle_exceptions(verbose)
     async def _migrate() -> None:
+        if dotenv:
+            load_dotenv()
+        config = load_config()
         for path in config.migrations.iterdir():
             if path.name.endswith(".rollback.sql"):
                 continue
@@ -524,7 +558,6 @@ def migrate_yoyo(
         connection_string = database or os.environ[config.database_env_key]
         db = await sql.get_connection(connection_string)
 
-        await sql.ensure_pogo_sync(db)
         await yoyo.copy_yoyo_migration_history(db)
 
     asyncio.run(_migrate())

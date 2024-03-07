@@ -45,14 +45,14 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
             msg = f"{path.name}: No '-- migrate: apply' found."
             raise exceptions.BadMigrationError(msg) from e
 
-        m = re.match(r".*-- (.*)\s-- depends:(.*)[\s]?", metadata.strip())
+        m = re.match(r".*--(.*)\s-- depends:(.*)[\s]?", metadata.strip())
 
         if m is None:
             msg = f"{path.name}: No '-- depends:' or message found."
             raise exceptions.BadMigrationError(msg)
 
-        message = m[1]
-        depends = m[2]
+        message = m[1].strip()
+        depends = m[2].strip()
 
         try:
             apply_content, rollback_content = contents.split("-- migrate: rollback")

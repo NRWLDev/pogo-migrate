@@ -49,6 +49,7 @@ pre-commit = "^3.0.2"
 # Release management
 changelog-gen = {version = "^0.9.1", extras = ["bump-my-version"]}
 pytest-asyncio = "^0.23.5"
+nest-asyncio = "^1.6.0"
 
 [tool.bumpversion]
 current_version = "0.0.3"
@@ -87,17 +88,21 @@ date_format = "(released %Y-%m-%d)"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--random-order"
+addopts = [
+    "--random-order",
+    "-p no:logging",
+]
 env = [
     "D:POSTGRES_DSN=postgres://unit:password@localhost:5435/unit",
 ]
 
 [tool.coverage.report]
 sort = "cover"
-fail_under = 50
+fail_under = 90
 show_missing = true
 skip_covered = true
 exclude_lines = [
+    "# pragma: no cover",
     "if t.TYPE_CHECKING:",
 ]
 
