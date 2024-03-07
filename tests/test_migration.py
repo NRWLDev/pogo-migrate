@@ -74,7 +74,7 @@ class TestReadSqlMigration:
         )
         message, depends, _, _ = migration.read_sql_migration(mp)
 
-    def test_apply_func_created(self, migration_file_factory):
+    async def test_apply_func_created(self, migration_file_factory):
         mp = migration_file_factory(
             "20210101_01_rando-migration-message",
             "sql",
@@ -94,17 +94,23 @@ class TestReadSqlMigration:
             """),
         )
         _, _, apply, _ = migration.read_sql_migration(mp)
-        assert apply.__annotations__["source"] == dedent('''\
-        async def apply(db):
-            await db.execute("""CREATE TABLE table_one();""")
-            await db.execute("""CREATE TABLE table_two();""")
-            await db.execute("""CREATE TABLE public.user (
-            id BIGSERIAL PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            CONSTRAINT uc_name UNIQUE (name)
-        );""")''')
 
-    def test_rollback_func_created(self, migration_file_factory):
+        db = mock.Mock(execute=AsyncMock())
+        await apply(db)
+        assert db.execute.call_args_list == [
+            mock.call("CREATE TABLE table_one();"),
+            mock.call("CREATE TABLE table_two();"),
+            mock.call(
+                dedent("""\
+            CREATE TABLE public.user (
+                id BIGSERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                CONSTRAINT uc_name UNIQUE (name)
+            );"""),
+            ),
+        ]
+
+    async def test_rollback_func_created(self, migration_file_factory):
         mp = migration_file_factory(
             "20210101_01_rando-migration-message",
             "sql",
@@ -127,15 +133,20 @@ class TestReadSqlMigration:
             """),
         )
         _, _, _, rollback = migration.read_sql_migration(mp)
-        assert rollback.__annotations__["source"] == dedent('''\
-        async def rollback(db):
-            await db.execute("""DROP TABLE table_two;""")
-            await db.execute("""DROP TABLE table_one;""")
-            await db.execute("""CREATE TABLE public.user (
-            id BIGSERIAL PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            CONSTRAINT uc_name UNIQUE (name)
-        );""")''')
+        db = mock.Mock(execute=AsyncMock())
+        await rollback(db)
+        assert db.execute.call_args_list == [
+            mock.call("DROP TABLE table_two;"),
+            mock.call("DROP TABLE table_one;"),
+            mock.call(
+                dedent("""\
+            CREATE TABLE public.user (
+                id BIGSERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                CONSTRAINT uc_name UNIQUE (name)
+            );"""),
+            ),
+        ]
 
 
 class TestMigration:

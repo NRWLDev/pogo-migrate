@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import hashlib
 import importlib.util
 import logging
@@ -17,19 +16,6 @@ if t.TYPE_CHECKING:
     import asyncpg
 
 logger = logging.getLogger(__name__)
-
-
-def generate_awaitable(name: str, statements: list[str]) -> t.Awaitable:
-    func_lines = [f"async def {name}(db):"]
-    func_lines.extend([f'''    await db.execute("""{stmt}""")''' for stmt in statements] if statements else ["    ..."])
-
-    tree = ast.parse("\n".join(func_lines))
-    code = compile(tree, filename="_", mode="exec")
-    namespace = {}
-    exec(code, namespace)  # noqa: S102
-    fn = namespace[name]
-    fn.__annotations__["source"] = "\n".join(func_lines)
-    return fn
 
 
 def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
@@ -61,10 +47,16 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
             raise exceptions.BadMigrationError(msg) from e
 
         apply_statements = sqlparse.split(apply_content.strip())
-        apply = generate_awaitable("apply", apply_statements)
+
+        async def apply(db):  # noqa: ANN001, ANN202
+            for statement in apply_statements:
+                await db.execute(statement)
 
         rollback_statements = sqlparse.split(rollback_content.strip())
-        rollback = generate_awaitable("rollback", rollback_statements)
+
+        async def rollback(db):  # noqa: ANN001, ANN202
+            for statement in rollback_statements:
+                await db.execute(statement)
 
         return message, depends, apply, rollback
 
