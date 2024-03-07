@@ -336,7 +336,7 @@ def new(
             raise typer.Exit(code=0)
 
         p = create_with_editor(config, content, extension, verbose)
-        logger.error("Created file: %s", p.as_posix().replace(str(config.root_directory), "").lstrip("/"))
+        logger.error("Created file: %s", p.as_posix().replace(config.root_directory.as_posix(), "").lstrip("/"))
 
     asyncio.run(new_())
 
@@ -550,12 +550,12 @@ def migrate_yoyo(
                     f.write(content)
                 logger.error(
                     "Converted '%s' successfully.",
-                    path.as_posix().replace(str(config.root_directory), "").lstrip("/"),
+                    path.as_posix().replace(config.root_directory.as_posix(), "").lstrip("/"),
                 )
             else:
                 logger.error(
                     "Python files can not be migrated reliably, please manually update '%s'.",
-                    path.as_posix().replace(str(config.root_directory), "").lstrip("/"),
+                    path.as_posix().replace(config.root_directory.as_posix(), "").lstrip("/"),
                 )
 
         connection_string = database or os.environ[config.database_env_key]
