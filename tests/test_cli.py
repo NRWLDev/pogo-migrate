@@ -8,11 +8,6 @@ from pogo_migrate import cli, sql
 from tests.util import AsyncMock
 
 
-def assert_output(output, expected):
-    clean_output = "\n".join([line.strip() for line in output.split("\n")])
-    assert clean_output.strip() == expected.strip()
-
-
 def test_version(cli_runner):
     version = importlib.metadata.version("pogo-migrate")
     result = cli_runner.invoke(["--version"])
@@ -56,8 +51,7 @@ class TestInit:
     def test_init_invalid_migrations_location(self, cwd, cli_runner):
         result = cli_runner.invoke(["init", "-m", str(cwd.parent / "migrations")])
         assert result.exit_code == 1, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("migrations_location is not a child of current location."),
         )
 
@@ -110,8 +104,7 @@ class TestInit:
 
         result = cli_runner.invoke(["init"])
         assert result.exit_code == 1
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("pogo already configured."),
         )
 
@@ -138,8 +131,7 @@ class TestInit:
 
         result = cli_runner.invoke(["init", "-v"])
         assert result.exit_code == 1
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             pogo already configured.
 
@@ -154,8 +146,7 @@ class TestNew:
     def test_no_config(self, cli_runner):
         result = cli_runner.invoke(["new"])
         assert result.exit_code == 1, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             "No configuration found, missing pyproject.toml, run 'pogo init ...'",
         )
 
@@ -182,8 +173,7 @@ class TestNew:
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock(side_effect=OSError))
         result = cli_runner.invoke(["new"])
         assert result.exit_code == 1, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             "Error: could not open editor!",
         )
 
@@ -192,8 +182,7 @@ class TestNew:
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         result = cli_runner.invoke(["new"])
         assert result.exit_code == 1, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             "Abort: no changes made",
         )
 
@@ -206,12 +195,10 @@ class TestNew:
         result = cli_runner.invoke(["new", "--sql", "-v"])
 
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output.strip(),
+        cli_runner.assert_output(
             dedent(f"""\
             Created file:
-            {migrations}/new_file.
-            sql
+            {migrations}/new_file.sql
             """).strip(),
         )
 
@@ -244,8 +231,7 @@ class TestNew:
         result = cli_runner.invoke(["new"], input="q\n")
 
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             Error loading migration.
             Retry editing? [Ynqh]: q
@@ -261,8 +247,7 @@ class TestNew:
         result = cli_runner.invoke(["new"], input="a\nb\nq\n")
 
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             Error loading migration.
             Retry editing? [Ynqh]: a
@@ -280,8 +265,7 @@ class TestNew:
         result = cli_runner.invoke(["new"], input="h\nq\n")
 
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             Error loading migration.
             Retry editing? [Ynqh]: h
@@ -304,8 +288,7 @@ class TestNew:
         result = cli_runner.invoke(["new"], input="y\nn\n")
 
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent(f"""\
             Error loading migration.
             Retry editing? [Ynqh]: y
@@ -327,8 +310,7 @@ class TestNew:
         result = cli_runner.invoke(["new"], input="\nn\n")
 
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent(f"""\
             Error loading migration.
             Retry editing? [Ynqh]:
@@ -346,8 +328,7 @@ class TestHistory:
     def test_no_migrations(self, cli_runner):
         result = cli_runner.invoke(["history"])
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             STATUS    ID    FORMAT
             --------  ----  --------
@@ -380,8 +361,7 @@ class TestHistory:
         )
         result = cli_runner.invoke(["history"])
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             STATUS    ID                        FORMAT
             --------  ------------------------  --------
@@ -418,8 +398,7 @@ class TestHistory:
         )
         result = cli_runner.invoke(["history"])
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             STATUS    ID                        FORMAT
             --------  ------------------------  --------
@@ -469,8 +448,7 @@ class TestApply:
         )
         result = cli_runner.invoke(["apply"])
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             Applying 20210101_01_rando-commit
             Applying 20210101_02_rando-commit
@@ -506,8 +484,7 @@ class TestApply:
         )
         result = cli_runner.invoke(["apply"])
         assert result.exit_code == 1, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             Applying 20210101_01_rando-commit
             Applying 20210101_02_rando-commit
@@ -592,8 +569,7 @@ class TestRollback:
         )
         result = cli_runner.invoke(["rollback", "--count", "-1"])
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             Rolling back 20210101_02_rando-commit
             Rolling back 20210101_01_rando-commit
@@ -622,8 +598,7 @@ class TestRollback:
         )
         result = cli_runner.invoke(["rollback"])
         assert result.exit_code == 1, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             Rolling back 20210101_01_rando-commit
             Failed to rollback 20210101_01_rando-commit
@@ -658,8 +633,7 @@ class TestMark:
     def test_mark_no_migrations(self, cli_runner):
         result = cli_runner.invoke(["mark"])
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             "",
         )
 
@@ -702,8 +676,7 @@ class TestMark:
         )
         result = cli_runner.invoke(["mark"], input="y\nn\n")
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             Mark 20210101_02_rando-commit as applied? [y/N]: y
             Mark 20210101_03_rando-commit as applied? [y/N]: n
@@ -718,8 +691,7 @@ class TestUnMark:
     def test_unmark_no_migrations(self, cli_runner):
         result = cli_runner.invoke(["unmark"])
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             "",
         )
 
@@ -763,8 +735,7 @@ class TestUnMark:
         )
         result = cli_runner.invoke(["unmark"], input="y\nn\n")
         assert result.exit_code == 0, result.output
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent("""\
             Unmark 20210101_02_rando-commit as applied? [y/N]: y
             Unmark 20210101_01_rando-commit as applied? [y/N]: n
@@ -814,15 +785,12 @@ class TestMigrateYoyo:
 
         result = cli_runner.invoke(["migrate-yoyo"])
         assert result.exit_code == 0
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent(f"""\
             Converted
-            '{cwd}/migrations/2
-            0210101_02_rando-commit2.sql' successfully.
+            '{cwd}/migrations/20210101_02_rando-commit2.sql' successfully.
             Converted
-            '{cwd}/migrations/2
-            0210101_01_rando-commit.sql' successfully.
+            '{cwd}/migrations/20210101_01_rando-commit.sql' successfully.
             """),
         )
 
@@ -843,11 +811,9 @@ class TestMigrateYoyo:
 
         result = cli_runner.invoke(["migrate-yoyo"])
         assert result.exit_code == 0
-        assert_output(
-            result.output,
+        cli_runner.assert_output(
             dedent(f"""\
             Python files can not be migrated reliably, please manually update
-            '{cwd}/migrations/2021
-            0101_01_rando-commit.py'.
+            '{cwd}/migrations/20210101_01_rando-commit.py'.
             """),
         )

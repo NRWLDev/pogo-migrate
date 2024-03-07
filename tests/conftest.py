@@ -104,16 +104,29 @@ async def db_session(postgres_dsn):
 
 class CliRunner(typer.testing.CliRunner):
     target = pogo_migrate.cli.app
+    result = None
 
     def invoke(self, *args, **kwargs):
         result = super().invoke(self.target, *args, **kwargs)
+        self.result = result
         if result.exception:
             if isinstance(result.exception, SystemExit):
                 # The error is already properly handled. Print it and return.
                 print(result.output)  # noqa: T201
             else:
                 raise result.exception.with_traceback(result.exc_info[2])
-        return result
+        return self.result
+
+    def assert_output(self, expected):
+        clean_output = "\n".join([line.strip() for line in self.result.output.split("\n")])
+        expected_lines = []
+        for line in expected.strip().split("\n"):
+            if len(line) > 80:  # noqa: PLR2004
+                expected_lines.extend([line[:80], line[80:]])
+            else:
+                expected_lines.append(line)
+        clean_expected = "\n".join(expected_lines)
+        assert clean_output.strip() == clean_expected
 
 
 @pytest.fixture()
