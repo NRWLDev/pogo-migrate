@@ -295,8 +295,7 @@ class TestNew:
             Error loading migration.
             Retry editing? [Ynqh]: n
             Created file:
-            {cwd}/new_fil
-            e.py
+            {cwd}/new_file.py
             """),
         )
 
@@ -317,8 +316,7 @@ class TestNew:
             Error loading migration.
             Retry editing? [Ynqh]: n
             Created file:
-            {cwd}/new_fil
-            e.py
+            {cwd}/new_file.py
             """),
         )
 
