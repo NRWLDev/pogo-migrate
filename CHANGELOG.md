@@ -2,8 +2,6 @@
 
 ## v0.0.4 (released 2024-03-07)
 
-## v0.0.4rc0 (released 2024-03-07)
-
 ### Bug fixes
 
 - Clean up error handling and transaction usage in cli.
