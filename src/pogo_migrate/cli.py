@@ -90,18 +90,14 @@ def _callback(  # pragma: no cover
 app = typer.Typer(name="pogo", callback=_callback)
 
 
-P = t.ParamSpec("P")
-R = t.TypeVar("R")
-
-
-def handle_exceptions(verbose: int):  # noqa: ANN201
+def handle_exceptions(verbose: int) -> t.Callable:
     setup_logging(verbose)
 
-    def inner(f: t.Callable[P, t.Awaitable[R]]) -> t.Callable[P, t.Awaitable[R]]:
+    def inner(f: t.Callable) -> t.Callable:
         """Decorator to handle exceptions from migrations."""
 
         @functools.wraps(f)
-        async def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
+        async def wrapped(*args, **kwargs):  # noqa: ANN202, ANN002, ANN003
             """Wrapped function.
 
             Args:
