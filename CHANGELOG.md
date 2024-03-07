@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.3rc0 (released 2024-03-07)
+
+### Bug fixes
+
+- Expose bad migration information on failed apply/rollback.
+
 ## v0.0.2 (released 2024-03-06)
 
 ### Bug fixes
