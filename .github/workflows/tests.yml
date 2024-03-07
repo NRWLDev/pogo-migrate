@@ -16,6 +16,21 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: unit
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: unit
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.9
@@ -28,6 +43,8 @@ jobs:
         poetry config virtualenvs.create false
         poetry install
     - name: Generate coverage report
+      env:
+        POSTGRES_DSN: postgres://unit:password@localhost:5432/unit
       run: |
         pytest --cov=web_error --cov-report=xml
     - name: Upload coverage to Codecov
