@@ -1,5 +1,7 @@
 # Changelog
 
+## v0.0.5 (released 2024-03-07)
+
 ## v0.0.5rc0 (released 2024-03-07)
 
 ### Bug fixes
