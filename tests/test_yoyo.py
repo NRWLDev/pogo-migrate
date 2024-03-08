@@ -18,7 +18,7 @@ def test_convert_sql_migration_no_rollback(cwd):
     content = yoyo.convert_sql_migration(p)
     assert content == dedent("""\
     -- commit message
-    -- depends:  20190101_01_slug2-initial-commit
+    -- depends: 20190101_01_slug2-initial-commit
 
     -- migrate: apply
 

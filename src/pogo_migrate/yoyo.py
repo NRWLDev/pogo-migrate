@@ -15,21 +15,21 @@ def convert_sql_migration(migration: Path) -> str:
             rollback_content = f.read()
         rollback.unlink()
 
-    m = re.match(r".*-- (.*)\s-- depends:(.*)\s", apply_content)
+    m = re.match(r".*--(.*)\s-- depends:(.*)\s", apply_content)
 
     message, depends = "--", "-- depends:"
     if m:
-        message = f"-- {m[1]}"
-        depends = f"-- depends: {m[2]}"
+        message = f"-- {m[1].strip()}"
+        depends = f"-- depends: {m[2].strip()}"
 
     content = [message, depends]
 
     content.extend(["", "-- migrate: apply", ""])
-    apply_content = re.sub(r".*-- (.*)\s-- depends:(.*)\s", "", apply_content)
+    apply_content = re.sub(r".*--(.*)\s-- depends:(.*)\s", "", apply_content)
     content.append(apply_content.strip())
 
     content.extend(["", "-- migrate: rollback", ""])
-    rollback_content = re.sub(r".*-- (.*)\s-- depends:(.*)\s", "", rollback_content)
+    rollback_content = re.sub(r".*--(.*)\s-- depends:(.*)\s", "", rollback_content)
     content.append(rollback_content.strip())
 
     return "\n".join(content)

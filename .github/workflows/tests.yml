@@ -51,7 +51,7 @@ jobs:
       uses: codecov/codecov-action@v1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        slug: NRWLDev/web-error
+        slug: NRWLDev/pogo-migrate
         file: ./coverage.xml
         flags: unittests
         name: codecov-umbrella
