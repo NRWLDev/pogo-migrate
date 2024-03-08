@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.0.6rc0 (released 2024-03-08)
+
+### Bug fixes
+
+- Pick up migrations from correct location when running pogo from a subdirectory
+- Drop ast/eval usage and return to closures.
+
 ## v0.0.5 (released 2024-03-07)
 
 ### Bug fixes
