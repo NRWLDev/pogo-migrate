@@ -1,7 +1,10 @@
+import logging
 import re
 from pathlib import Path
 
 import asyncpg
+
+logger = logging.getLogger(__name__)
 
 
 def convert_sql_migration(migration: Path) -> str:
@@ -36,6 +39,16 @@ def convert_sql_migration(migration: Path) -> str:
 
 
 async def copy_yoyo_migration_history(db: asyncpg.Connection) -> None:
+    stmt = """
+    SELECT count(*)
+    FROM _pogo_migration
+    """
+    r = await db.fetchrow(stmt)
+
+    if r["count"] != 0:
+        logger.warning("migration history exists, skipping yoyo migration.")
+        return
+
     stmt = """
     INSERT INTO _pogo_migration (migration_hash, migration_id, applied)
     SELECT
