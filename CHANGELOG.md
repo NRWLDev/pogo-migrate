@@ -4,11 +4,7 @@
 
 ### Features and Improvements
 
-- Support non [#5](https://github.com/NRWLDev/pogo-migrate/issues/5) [bdd24bf](https://github.com/NRWLDev/pogo-migrate/commit/bdd24bf72e85aa25f2aad7c9f7d87b66f9bf0663)
-
-## v0.0.7rc0 (released 2024-03-08)
-
-### Features and Improvements
+- Support non-interactive 'pogo mark' [#5](https://github.com/NRWLDev/pogo-migrate/issues/5) [bdd24bf](https://github.com/NRWLDev/pogo-migrate/commit/bdd24bf72e85aa25f2aad7c9f7d87b66f9bf0663)
 
 - Support ability to just migrate yoyo migration history in db. [#3](https://github.com/NRWLDev/pogo-migrate/issues/3) [ab773a6](https://github.com/NRWLDev/pogo-migrate/commit/ab773a6d4d314408af7797fd5d537759cfc171b7)
 
