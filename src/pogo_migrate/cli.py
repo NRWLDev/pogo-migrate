@@ -27,6 +27,11 @@ from pogo_migrate.config import Config, load_config
 from pogo_migrate.migration import Migration, topological_sort
 from pogo_migrate.util import get_editor, make_file
 
+if sys.version_info < (3, 10):
+    from typing_extensions import ParamSpec
+else:
+    from typing import ParamSpec
+
 logger = logging.getLogger(__name__)
 
 VERBOSITY = {
@@ -91,14 +96,18 @@ def _callback(  # pragma: no cover
 app = typer.Typer(name="pogo", callback=_callback)
 
 
-def handle_exceptions(verbose: int) -> t.Callable:
+P = ParamSpec("P")
+R = t.TypeVar("R")
+
+
+def handle_exceptions(verbose: int) -> t.Callable[t.Callable[P, t.Awaitable[R]], t.Callable[P, t.Awaitable[R]]]:
     setup_logging(verbose)
 
-    def inner(f: t.Callable) -> t.Callable:
+    def inner(f: t.Callable[P, t.Awaitable[R]]) -> t.Callable[P, t.Awaitable[R]]:
         """Decorator to handle exceptions from migrations."""
 
         @functools.wraps(f)
-        async def wrapped(*args, **kwargs):  # noqa: ANN202, ANN002, ANN003
+        async def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
             """Wrapped function.
 
             Args:
