@@ -4,7 +4,11 @@
 
 ### Features and Improvements
 
-- Support ability to just migrate yoyo migration history in db. [[#3](https://github.com/NRWLDev/pogo-migrate/issues/3)] [[ab773a6](https://github.com/NRWLDev/pogo-migrate/commit/ab773a6d4d314408af7797fd5d537759cfc171b7)]
+- Support ability to just migrate yoyo migration history in db. [#3](https://github.com/NRWLDev/pogo-migrate/issues/3) [ab773a6](https://github.com/NRWLDev/pogo-migrate/commit/ab773a6d4d314408af7797fd5d537759cfc171b7)
+
+### Bug fixes
+
+- Add clearer messaging on missing env key [#1](https://github.com/NRWLDev/pogo-migrate/issues/1)
 
 ## v0.0.6 (released 2024-03-08)
 
