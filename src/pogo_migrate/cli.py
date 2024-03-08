@@ -530,6 +530,7 @@ def unmark(
 def migrate_yoyo(
     database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
+    skip_files: bool = typer.Option(False, help="Skip file migration, just copy yoyo history."),  # noqa: FBT003
     dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
@@ -547,24 +548,27 @@ def migrate_yoyo(
         if dotenv:  # pragma: no cover
             load_dotenv()
         config = load_config()
-        for path in sorted(config.migrations.iterdir()):
-            if path.name.endswith(".rollback.sql"):
-                continue
+        if not skip_files:
+            for path in sorted(config.migrations.iterdir()):
+                if path.name.endswith(".rollback.sql"):
+                    continue
 
-            if path.suffix == ".sql":
-                content = yoyo.convert_sql_migration(path)
+                if path.suffix == ".sql":
+                    content = yoyo.convert_sql_migration(path)
 
-                with path.open("w") as f:
-                    f.write(content)
-                logger.error(
-                    "Converted '%s' successfully.",
-                    path.as_posix().replace(config.root_directory.as_posix(), "").lstrip("/"),
-                )
-            else:
-                logger.error(
-                    "Python files can not be migrated reliably, please manually update '%s'.",
-                    path.as_posix().replace(config.root_directory.as_posix(), "").lstrip("/"),
-                )
+                    with path.open("w") as f:
+                        f.write(content)
+                    logger.error(
+                        "Converted '%s' successfully.",
+                        path.as_posix().replace(config.root_directory.as_posix(), "").lstrip("/"),
+                    )
+                else:
+                    logger.error(
+                        "Python files can not be migrated reliably, please manually update '%s'.",
+                        path.as_posix().replace(config.root_directory.as_posix(), "").lstrip("/"),
+                    )
+        else:
+            logger.debug("skip-files set, ignoring existing migration files.")
 
         connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)

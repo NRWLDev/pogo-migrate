@@ -367,7 +367,6 @@ class TestHistory:
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_migrations_partial_applied(self, cli_runner, migration_file_factory, db_session):
-        await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -534,7 +533,6 @@ class TestRollback:
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_rollback_success(self, cli_runner, migration_file_factory, db_session):
-        await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
         await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
         await db_session.execute("create table table_one();create table table_two()")
@@ -574,7 +572,6 @@ class TestRollback:
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_rollback_failure(self, cli_runner, migration_file_factory, db_session):
-        await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
         await db_session.execute("create table table_one();create table table_two()")
         migration_file_factory(
@@ -604,7 +601,6 @@ class TestRollback:
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_rollback_failure_verbose(self, cli_runner, migration_file_factory, db_session):
-        await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -634,7 +630,6 @@ class TestMark:
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_mark_migrations_applied(self, cli_runner, migration_file_factory, db_session):
-        await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -692,7 +687,6 @@ class TestUnMark:
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_unmark_migrations(self, cli_runner, migration_file_factory, db_session):
-        await sql.ensure_pogo_sync(db_session)
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
         await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
         migration_file_factory(
@@ -742,6 +736,69 @@ class TestUnMark:
 
 class TestMigrateYoyo:
     @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_skip_files(self, migration_file_factory, cli_runner, db_session):
+        await db_session.execute("""
+        create table _yoyo_migration (
+            migration_hash varchar(64),
+            migration_id varchar(255),
+            applied_at_utc timestamp
+        );""")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            CREATE TABLE table_one();
+            """),
+        )
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "rollback.sql",
+            dedent("""
+            -- commit
+            -- depends:
+            DROP TABLE table_one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit2",
+            "sql",
+            dedent("""
+            -- commit2
+            -- depends: 20210101_01_rando-commit
+            CREATE TABLE table_two()
+            """),
+        )
+
+        result = cli_runner.invoke(["migrate-yoyo", "--skip-files", "-vvv"])
+        assert result.exit_code == 0
+        cli_runner.assert_output(
+            dedent("""\
+            skip-files set, ignoring existing migration files.
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_history_already_loaded(self, cli_runner, db_session):
+        await db_session.execute("""
+        create table _yoyo_migration (
+            migration_hash varchar(64),
+            migration_id varchar(255),
+            applied_at_utc timestamp
+        );""")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+
+        result = cli_runner.invoke(["migrate-yoyo", "-vvv"])
+        assert result.exit_code == 0
+        cli_runner.assert_output(
+            dedent("""\
+            migration history exists, skipping yoyo migration.
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_sql_files_converted(self, migration_file_factory, cli_runner, db_session):
         await db_session.execute("""
         create table _yoyo_migration (
@@ -789,7 +846,6 @@ class TestMigrateYoyo:
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_py_files_skipped(self, migration_file_factory, cli_runner, db_session):
-        await sql.ensure_pogo_sync(db_session)
         await db_session.execute("""
         create table _yoyo_migration (
             migration_hash varchar(64),
