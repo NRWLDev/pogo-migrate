@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.7 (released 2024-03-08)
+
+### Features and Improvements
+
+- Support non [#5](https://github.com/NRWLDev/pogo-migrate/issues/5) [bdd24bf](https://github.com/NRWLDev/pogo-migrate/commit/bdd24bf72e85aa25f2aad7c9f7d87b66f9bf0663)
+
 ## v0.0.7rc0 (released 2024-03-08)
 
 ### Features and Improvements
