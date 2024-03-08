@@ -6,7 +6,6 @@ import functools
 import importlib.metadata
 import importlib.util
 import logging
-import os
 import shlex
 import subprocess
 import sys
@@ -370,7 +369,7 @@ def history(
             load_dotenv()
         config = load_config()
 
-        connection_string = database or os.environ[config.database_env_key]
+        connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
 
         migrations = await sql.read_migrations(config.migrations, db)
@@ -409,7 +408,7 @@ def apply(
             load_dotenv()
         config = load_config()
 
-        connection_string = database or os.environ[config.database_env_key]
+        connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
 
         await migrate.apply(config, db)
@@ -443,7 +442,7 @@ def rollback(
             load_dotenv()
         config = load_config()
 
-        connection_string = database or os.environ[config.database_env_key]
+        connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
 
         await migrate.rollback(config, db, count=count if count > 0 else None)
@@ -471,7 +470,7 @@ def mark(
             load_dotenv()
         config = load_config()
 
-        connection_string = database or os.environ[config.database_env_key]
+        connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
 
         migrations = await sql.read_migrations(config.migrations, db)
@@ -509,7 +508,7 @@ def unmark(
             load_dotenv()
         config = load_config()
 
-        connection_string = database or os.environ[config.database_env_key]
+        connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
 
         migrations = await sql.read_migrations(config.migrations, db)
@@ -567,7 +566,7 @@ def migrate_yoyo(
                     path.as_posix().replace(config.root_directory.as_posix(), "").lstrip("/"),
                 )
 
-        connection_string = database or os.environ[config.database_env_key]
+        connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
 
         await yoyo.copy_yoyo_migration_history(db)

@@ -85,6 +85,8 @@ allowed_branches = [
     "main",
 ]
 date_format = "(released %Y-%m-%d)"
+issue_link = "https://github.com/NRWLDev/pogo-migrate/issues/::issue_ref::"
+commit_link = "https://github.com/NRWLDev/pogo-migrate/commit/::commit_hash::"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

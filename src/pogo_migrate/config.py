@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import os
+import typing as t
 from pathlib import Path
 
 import rtoml
@@ -19,6 +21,14 @@ class Config:
     root_directory: Path
     migrations: Path
     database_env_key: str
+
+    @property
+    def database_dsn(self: t.Self) -> str:
+        try:
+            return os.environ[self.database_env_key]
+        except KeyError as e:
+            msg = f"Configured database_env_key='{self.database_env_key}' not set."
+            raise exceptions.InvalidConfigurationError(msg) from e
 
     @classmethod
     def from_dict(cls: type[Config], data: dict, root_directory: Path) -> Config:

@@ -55,7 +55,7 @@ def test_load_config_not_found(monkeypatch):
     assert str(e.value) == "No configuration found, missing pyproject.toml, run 'pogo init ...'"
 
 
-def test_load_config_not_configuration(monkeypatch, cwd):
+def test_load_config_no_configuration(monkeypatch, cwd):
     p = cwd / "pyproject.toml"
 
     with p.open("w") as f:
@@ -88,3 +88,16 @@ database_env_key = "POSTGRES_DSN"
         migrations=cwd / "migrations",
         database_env_key="POSTGRES_DSN",
     )
+
+
+def test_config_database_dsn_not_set(cwd):
+    c = config.Config(
+        root_directory=cwd,
+        migrations=cwd / "migrations",
+        database_env_key="UNSET_KEY",
+    )
+
+    with pytest.raises(exceptions.InvalidConfigurationError) as e:
+        c.database_dsn  # noqa: B018
+
+    assert str(e.value) == "Configured database_env_key='UNSET_KEY' not set."
