@@ -48,7 +48,7 @@ ruff = "^0.3.0"
 pre-commit = "^3.0.2"
 
 # Release management
-changelog-gen = {version = "^0.9.1", extras = ["bump-my-version"]}
+changelog-gen = {version = "^0.9", extras = ["bump-my-version"]}
 pytest-asyncio = "^0.23.5"
 nest-asyncio = "^1.6.0"
 
