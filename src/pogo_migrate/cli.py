@@ -454,6 +454,7 @@ def rollback(
 def mark(
     database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
+    interactive: bool = typer.Option(True, help="Confirm all changes."),  # noqa: FBT003
     dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
@@ -480,7 +481,7 @@ def mark(
             for migration in migrations:
                 migration.load()
                 if not migration.applied:
-                    if not typer.confirm(f"Mark {migration.id} as applied?"):
+                    if interactive and not typer.confirm(f"Mark {migration.id} as applied?"):
                         break
 
                     await sql.migration_applied(db, migration.id, migration.hash)

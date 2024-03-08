@@ -675,6 +675,54 @@ class TestMark:
         applied_migrations = await sql.get_applied_migrations(db_session)
         assert applied_migrations == {"20210101_01_rando-commit", "20210101_02_rando-commit"}
 
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_mark_migrations_non_interactive(self, cli_runner, migration_file_factory, db_session):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_03_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_02_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["mark", "--no-interactive"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent(""),
+        )
+        applied_migrations = await sql.get_applied_migrations(db_session)
+        assert applied_migrations == {
+            "20210101_01_rando-commit",
+            "20210101_02_rando-commit",
+            "20210101_03_rando-commit",
+        }
+
 
 class TestUnMark:
     @pytest.mark.usefixtures("migrations", "pyproject")
