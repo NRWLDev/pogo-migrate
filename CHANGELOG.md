@@ -2,8 +2,6 @@
 
 ## v0.0.6 (released 2024-03-08)
 
-## v0.0.6rc0 (released 2024-03-08)
-
 ### Bug fixes
 
 - Pick up migrations from correct location when running pogo from a subdirectory
