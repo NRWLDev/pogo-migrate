@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pogo_migrate"
+name = "pogo-migrate"
 version = "0.0.7"
 description = "Database migration tool for asyncpg"
 readme = "README.md"
