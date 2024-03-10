@@ -2,8 +2,6 @@
 
 ## v0.0.8 (released 2024-03-10)
 
-## v0.0.8rc0 (released 2024-03-10)
-
 ### Bug fixes
 
 - Bugfix python template depends, and allow pytest fixture to generate database connection based on configuration [66149a6](https://github.com/NRWLDev/pogo-migrate/commit/66149a62f46833fe6d22fde00b579d580ba2266c)

@@ -332,7 +332,8 @@ def new(
 
         template = migration_sql_template if sql_ else migration_template
         depends = migrations[-1].id if migrations else ""
-        depends = f" {depends}" if sql_ and depends else f'''"{'", "'.join(depends)}"'''
+        depends = f" {depends}" if sql_ and depends else depends
+        depends = f'''"{'", "'.join(depends)}"''' if not sql_ and depends else depends
         message = f" {message_}" if sql_ and message_ else message_
         content = template.format(message=message, depends=depends)
         extension = ".sql" if sql_ else ".py"
