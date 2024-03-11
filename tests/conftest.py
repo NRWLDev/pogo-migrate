@@ -1,6 +1,8 @@
 import asyncio
 import os
 import pathlib
+import re
+import textwrap
 
 import asyncpg
 import nest_asyncio
@@ -119,17 +121,13 @@ class CliRunner(typer.testing.CliRunner):
                 raise result.exception.with_traceback(result.exc_info[2])
         return self.result
 
+    def _clean_output(self, text: str):
+        output = text.strip().encode("ascii", errors="ignore").decode()
+        output = re.sub(r"\s+\n", "\n", output)
+        return textwrap.dedent(output)
+
     def assert_output(self, expected):
-        clean_output = "\n".join([line.strip() for line in self.result.output.split("\n")])
-        expected_lines = []
-        for line in expected.strip().split("\n"):
-            line_ = line
-            while len(line_) > 80:  # noqa: PLR2004
-                expected_lines.append(line[:80])
-                line_ = line[80:]
-            expected_lines.append(line_)
-        clean_expected = "\n".join(expected_lines)
-        assert clean_output.strip() == clean_expected
+        assert self._clean_output(self.result.output) == self._clean_output(expected)
 
 
 @pytest.fixture()
