@@ -122,9 +122,9 @@ class CliRunner(typer.testing.CliRunner):
         return self.result
 
     def _clean_output(self, text: str):
-        output = text.strip().encode("ascii", errors="ignore").decode()
+        output = text.encode("ascii", errors="ignore").decode()
         output = re.sub(r"\s+\n", "\n", output)
-        return textwrap.dedent(output)
+        return textwrap.dedent(output).strip()
 
     def assert_output(self, expected):
         assert self._clean_output(self.result.output) == self._clean_output(expected)
