@@ -90,6 +90,25 @@ database_env_key = "POSTGRES_DSN"
     )
 
 
+def test_load_config_database_config(monkeypatch, cwd):
+    p = cwd / "pyproject.toml"
+
+    with p.open("w") as f:
+        f.write("""
+[tool.pogo]
+migrations = "./migrations"
+database_config = "{POSTGRES_DSN}"
+""")
+    monkeypatch.setattr(config.logger, "error", mock.Mock())
+    c = config.load_config()
+
+    assert c == config.Config(
+        root_directory=cwd,
+        migrations=cwd / "migrations",
+        database_config="{POSTGRES_DSN}",
+    )
+
+
 def test_config_database_dsn_not_set(cwd):
     c = config.Config(
         root_directory=cwd,
@@ -101,3 +120,16 @@ def test_config_database_dsn_not_set(cwd):
         c.database_dsn  # noqa: B018
 
     assert str(e.value) == "Configured database_env_key='UNSET_KEY' not set."
+
+
+def test_config_database_config_dsn_not_set(cwd):
+    c = config.Config(
+        root_directory=cwd,
+        migrations=cwd / "migrations",
+        database_config="postgres://{UNSET_KEY}",
+    )
+
+    with pytest.raises(exceptions.InvalidConfigurationError) as e:
+        c.database_dsn  # noqa: B018
+
+    assert str(e.value) == "Configured database_config env var 'UNSET_KEY' not set."
