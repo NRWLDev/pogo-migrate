@@ -14,7 +14,7 @@ Add pogo to pyproject.toml
 ```toml
 [tool.pogo]
 migrations_location = "./migrations"
-database_env_key = "POSTGRES_DSN"
+database_config = "{POSTGRES_DSN}"
 ```
 
 If you have an existing environment with separate configuration values for
