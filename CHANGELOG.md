@@ -2,8 +2,6 @@
 
 ## v0.0.9 (released 2024-03-12)
 
-## v0.0.9rc0 (released 2024-03-12)
-
 ### Features and Improvements
 
 - Support separate database configuration env keys [#7](https://github.com/NRWLDev/pogo-migrate/issues/7) [72e7894](https://github.com/NRWLDev/pogo-migrate/commit/72e7894e9adfea024c53045fa2162c1d0d46016a)
