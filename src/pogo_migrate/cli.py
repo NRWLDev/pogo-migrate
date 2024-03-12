@@ -141,7 +141,7 @@ def handle_exceptions(verbose: int) -> t.Callable[t.Callable[P, t.Awaitable[R]],
 @app.command("init")
 def init(
     migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
-    database_env_key: str = typer.Option("POGO_DATABASE", "-d", "--database-env-key"),
+    database_config: str = typer.Option("{POGO_DATABASE}", "-d", "--database-env-key"),
     verbose: int = typer.Option(
         0,
         "-v",
@@ -184,7 +184,7 @@ def init(
             "tool": {
                 "pogo": {
                     "migrations": f"./{loc}",
-                    "database_env_key": database_env_key,
+                    "database_config": database_config,
                 },
             },
         }

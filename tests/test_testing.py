@@ -19,7 +19,7 @@ async def test_apply(monkeypatch, db_session, cwd):
         config.Config(
             root_directory=cwd,
             migrations=cwd / "migrations",
-            database_env_key="POSTGRES_DSN",
+            database_config="{POSTGRES_DSN}",
         ),
         db_session,
     )
@@ -33,7 +33,7 @@ async def test_rollback(monkeypatch, db_session, cwd):
         config.Config(
             root_directory=cwd,
             migrations=cwd / "migrations",
-            database_env_key="POSTGRES_DSN",
+            database_config="{POSTGRES_DSN}",
         ),
         db_session,
     )

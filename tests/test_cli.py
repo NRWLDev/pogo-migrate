@@ -45,7 +45,7 @@ class TestInit:
 
             [tool.pogo]
             migrations = './migrations'
-            database_env_key = 'POGO_DATABASE'
+            database_config = '{POGO_DATABASE}'
             """)
 
     def test_init_invalid_migrations_location(self, cwd, cli_runner):
@@ -74,11 +74,11 @@ class TestInit:
 
             [tool.pogo]
             migrations = './migrations'
-            database_env_key = 'POGO_DATABASE'
+            database_config = '{POGO_DATABASE}'
             """)
 
     def test_init_overrides(self, cwd, cli_runner):
-        result = cli_runner.invoke(["init", "-m", "./my-migrations", "-d", "POSTGRES_DSN"], input="y\n")
+        result = cli_runner.invoke(["init", "-m", "./my-migrations", "-d", "{POSTGRES_DSN}"], input="y\n")
         assert result.exit_code == 0, result.output
 
         p = cwd / "pyproject.toml"
@@ -87,7 +87,7 @@ class TestInit:
 
             [tool.pogo]
             migrations = './my-migrations'
-            database_env_key = 'POSTGRES_DSN'
+            database_config = '{POSTGRES_DSN}'
             """)
 
     def test_init_already_configured(self, cwd, cli_runner):
@@ -98,7 +98,7 @@ class TestInit:
 
             [tool.pogo]
             migrations = './my-migrations'
-            database_env_key = 'POSTGRES_DSN'
+            database_config = '{POSTGRES_DSN}'
             """),
             )
 
@@ -114,7 +114,7 @@ class TestInit:
 
             [tool.pogo]
             migrations = './my-migrations'
-            database_env_key = 'POSTGRES_DSN'
+            database_config = '{POSTGRES_DSN}'
             """)
 
     def test_init_already_configured_verbose(self, cwd, cli_runner):
@@ -125,7 +125,7 @@ class TestInit:
 
             [tool.pogo]
             migrations = './my-migrations'
-            database_env_key = 'POSTGRES_DSN'
+            database_config = '{POSTGRES_DSN}'
             """),
             )
 
@@ -137,7 +137,7 @@ class TestInit:
 
             [tool.pogo]
             migrations = "./my-migrations"
-            database_env_key = "POSTGRES_DSN"
+            database_config = "{POSTGRES_DSN}"
             """),
         )
 

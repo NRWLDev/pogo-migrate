@@ -64,7 +64,7 @@ def pyproject_factory(cwd):
                         "tool": {
                             "pogo": {
                                 "migrations": "./migrations",
-                                "database_env_key": "POSTGRES_DSN",
+                                "database_config": "{POSTGRES_DSN}",
                             },
                         },
                     },

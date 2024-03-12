@@ -13,7 +13,7 @@ def test_find_config_current_directory(cwd):
         f.write("""
 [tool.pogo]
 migrations = "./migrations"
-database_env_key = "POSTGRES_DSN"
+database_config = "{POSTGRES_DSN}"
 """)
 
     path = config.find_config()
@@ -28,7 +28,7 @@ def test_find_config_parent_directory(cwd):
         f.write("""
 [tool.pogo]
 migrations = "./migrations"
-database_env_key = "POSTGRES_DSN"
+database_config = "{POSTGRES_DSN}"
 """)
 
     subdir = cwd / "sub"
@@ -62,7 +62,7 @@ def test_load_config_no_configuration(monkeypatch, cwd):
         f.write("""
 [tool.other]
 migrations = "./migrations"
-database_env_key = "POSTGRES_DSN"
+database_config = "{POSTGRES_DSN}"
 """)
     monkeypatch.setattr(config.logger, "error", mock.Mock())
     with pytest.raises(exceptions.InvalidConfigurationError) as e:
@@ -78,7 +78,7 @@ def test_load_config_found(monkeypatch, cwd):
         f.write("""
 [tool.pogo]
 migrations = "./migrations"
-database_env_key = "POSTGRES_DSN"
+database_config = "{POSTGRES_DSN}"
 """)
     monkeypatch.setattr(config.logger, "error", mock.Mock())
     c = config.load_config()
@@ -86,7 +86,7 @@ database_env_key = "POSTGRES_DSN"
     assert c == config.Config(
         root_directory=cwd,
         migrations=cwd / "migrations",
-        database_env_key="POSTGRES_DSN",
+        database_config="{POSTGRES_DSN}",
     )
 
 
@@ -107,19 +107,6 @@ database_config = "{POSTGRES_DSN}"
         migrations=cwd / "migrations",
         database_config="{POSTGRES_DSN}",
     )
-
-
-def test_config_database_dsn_not_set(cwd):
-    c = config.Config(
-        root_directory=cwd,
-        migrations=cwd / "migrations",
-        database_env_key="UNSET_KEY",
-    )
-
-    with pytest.raises(exceptions.InvalidConfigurationError) as e:
-        c.database_dsn  # noqa: B018
-
-    assert str(e.value) == "Configured database_env_key='UNSET_KEY' not set."
 
 
 def test_config_database_config_dsn_not_set(cwd):

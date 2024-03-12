@@ -21,18 +21,10 @@ CONFIG_FILENAME = "pyproject.toml"
 class Config:
     root_directory: Path
     migrations: Path
-    database_env_key: str | None = None
-    database_config: str | None = None
+    database_config: str
 
     @property
     def database_dsn(self: t.Self) -> str:
-        if self.database_env_key:
-            try:
-                return os.environ[self.database_env_key]
-            except KeyError as e:
-                msg = f"Configured database_env_key='{self.database_env_key}' not set."
-                raise exceptions.InvalidConfigurationError(msg) from e
-
         try:
             format_kwargs = {
                 k[1]: os.environ[k[1]] for k in Formatter().parse(self.database_config) if k[1] is not None
