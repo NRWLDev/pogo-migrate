@@ -133,3 +133,13 @@ def test_config_database_config_dsn_not_set(cwd):
         c.database_dsn  # noqa: B018
 
     assert str(e.value) == "Configured database_config env var 'UNSET_KEY' not set."
+
+
+def test_config_database_config_no_keys(cwd):
+    c = config.Config(
+        root_directory=cwd,
+        migrations=cwd / "migrations",
+        database_config="postgres://fully-qualified",
+    )
+
+    assert c.database_dsn == "postgres://fully-qualified"

@@ -5,6 +5,7 @@ import logging
 import os
 import typing as t
 from pathlib import Path
+from string import Formatter
 
 import rtoml
 
@@ -31,11 +32,16 @@ class Config:
             except KeyError as e:
                 msg = f"Configured database_env_key='{self.database_env_key}' not set."
                 raise exceptions.InvalidConfigurationError(msg) from e
+
         try:
-            return self.database_config.format(**os.environ)
+            format_kwargs = {
+                k[1]: os.environ[k[1]] for k in Formatter().parse(self.database_config) if k[1] is not None
+            }
         except KeyError as e:
             msg = f"Configured database_config env var {e!s} not set."
             raise exceptions.InvalidConfigurationError(msg) from e
+
+        return self.database_config.format(**format_kwargs)
 
     @classmethod
     def from_dict(cls: type[Config], data: dict, root_directory: Path) -> Config:
