@@ -1,5 +1,7 @@
 # Changelog
 
+## v0.0.9 (released 2024-03-12)
+
 ## v0.0.9rc0 (released 2024-03-12)
 
 ### Features and Improvements
