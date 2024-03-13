@@ -1,5 +1,7 @@
 # Changelog
 
+## v0.0.10 (released 2024-03-13)
+
 ## v0.0.10rc0 (released 2024-03-13)
 
 ### Bug fixes
