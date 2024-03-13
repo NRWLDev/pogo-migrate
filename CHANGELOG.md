@@ -2,8 +2,6 @@
 
 ## v0.0.10 (released 2024-03-13)
 
-## v0.0.10rc0 (released 2024-03-13)
-
 ### Bug fixes
 
 - drop support for database_env_key [1d96e4f](https://github.com/NRWLDev/pogo-migrate/commit/1d96e4fcca822164f47ae65f5351d09054036c86)
