@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.11rc0 (released 2024-03-26)
+
+### Bug fixes
+
+- Fix issue where a single python dependency would be rendered by comma separated characters. [2a6a773](https://github.com/NRWLDev/pogo-migrate/commit/2a6a773e803609c393942bcd6523f44ec7f4e140)
+
 ## v0.0.10 (released 2024-03-13)
 
 ### Bug fixes
