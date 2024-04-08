@@ -2,8 +2,6 @@
 
 ## v0.0.12 (released 2024-04-08)
 
-## v0.0.12rc0 (released 2024-04-08)
-
 ### Miscellaneous
 
 - Relax typer versioning [[e2c5a8e](https://github.com/NRWLDev/pogo-migrate/commit/e2c5a8e3d893dedfb9c3d9be783518c6e5d91714)]
