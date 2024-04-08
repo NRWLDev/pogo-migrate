@@ -1,5 +1,7 @@
 # Changelog
 
+## v0.0.12 (released 2024-04-08)
+
 ## v0.0.12rc0 (released 2024-04-08)
 
 ### Miscellaneous
