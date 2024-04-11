@@ -1,5 +1,7 @@
 # Changelog
 
+## v0.0.13 (released 2024-04-11)
+
 ## v0.0.13rc0 (released 2024-04-11)
 
 ### Bug fixes
