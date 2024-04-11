@@ -50,6 +50,17 @@ async def copy_yoyo_migration_history(db: asyncpg.Connection) -> None:
         return
 
     stmt = """
+    SELECT EXISTS (
+       SELECT FROM information_schema.tables
+       WHERE   table_name   = '_yoyo_migration'
+    )"""
+    r = await db.fetchrow(stmt)
+
+    if not r["exists"]:
+        logger.warning("yoyo migration history missing, skipping yoyo migration.")
+        return
+
+    stmt = """
     INSERT INTO _pogo_migration (migration_hash, migration_id, applied)
     SELECT
         migration_hash, migration_id, applied_at_utc AS applied

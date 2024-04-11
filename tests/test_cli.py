@@ -847,6 +847,16 @@ class TestMigrateYoyo:
         )
 
     @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_no_yoyo_history(self, cli_runner):
+        result = cli_runner.invoke(["migrate-yoyo", "-vvv"])
+        assert result.exit_code == 0
+        cli_runner.assert_output(
+            dedent("""\
+            yoyo migration history missing, skipping yoyo migration.
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_sql_files_converted(self, migration_file_factory, cli_runner, db_session):
         await db_session.execute("""
         create table _yoyo_migration (
