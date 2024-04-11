@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.13rc0 (released 2024-04-11)
+
+### Bug fixes
+
+- Abort migration data copy, if no yoyo table found. [[915dfc2](https://github.com/NRWLDev/pogo-migrate/commit/915dfc2dfaac791986a52d120b693fa87e7c3539)]
+
 ## v0.0.12 (released 2024-04-08)
 
 ### Miscellaneous
