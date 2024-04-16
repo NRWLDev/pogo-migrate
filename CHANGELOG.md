@@ -1,5 +1,7 @@
 # Changelog
 
+## v0.0.14 (released 2024-04-16)
+
 ## v0.0.14rc0 (released 2024-04-16)
 
 ### Features and Improvements
