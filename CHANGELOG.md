@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.14rc0 (released 2024-04-16)
+
+### Features and Improvements
+
+- Support simple output in history command, and only showing unapplied migrations. [[d243c39](https://github.com/NRWLDev/pogo-migrate/commit/d243c39f2935f3af1105d0a808818dbe4f04af17)]
+
 ## v0.0.13 (released 2024-04-11)
 
 ### Bug fixes
