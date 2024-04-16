@@ -401,6 +401,74 @@ class TestHistory:
             """),
         )
 
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_migrations_partial_applied_only_unapplied(self, cli_runner, migration_file_factory, db_session):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["history", "--unapplied"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            STATUS    ID                        FORMAT
+            --------  ------------------------  --------
+            U         20210101_02_rando-commit  sql
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_migrations_partial_applied_unapplied_simple(self, cli_runner, migration_file_factory, db_session):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["history", "--unapplied", "--simple"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            U 20210101_02_rando-commit sql
+            """),
+        )
+
 
 class TestApply:
     async def assert_tables(self, db_session, tables):

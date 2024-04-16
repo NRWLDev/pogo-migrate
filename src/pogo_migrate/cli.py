@@ -354,6 +354,8 @@ def new(
 def history(
     database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
+    unapplied: bool = typer.Option(False, help="Show only unapplied migrations."),  # noqa: FBT003
+    simple: bool = typer.Option(False, help="Show raw data without tabulation."),  # noqa: FBT003
     dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
@@ -383,8 +385,13 @@ def history(
                 "sql" if m.is_sql else "py",
             )
             for m in migrations
+            if not unapplied or (unapplied and not m.applied)
         )
-        logger.error(tabulate.tabulate(data, headers=("STATUS", "ID", "FORMAT")))
+        if not simple:
+            logger.error(tabulate.tabulate(data, headers=("STATUS", "ID", "FORMAT")))
+        else:
+            for d in data:
+                logger.error(" ".join(d))
 
     asyncio.run(history_())
 
