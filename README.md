@@ -27,7 +27,7 @@ DROP TABLE foo;
 Pogo manages these migration scripts and provides command line tools to apply,
 rollback and show migration history.
 
-[Docs](https://nrwldev.github.io/pogo-migrate/)
+See the [docs](https://nrwldev.github.io/pogo-migrate/) for more details.
 
 ## Thanks and Credit
 
