@@ -5,6 +5,7 @@ repo_name: pogo-migrate
 repo_url: https://github.com/NRWLDev/pogo-migrate
 nav:
   - index.md
+  - why-pogo.md
   - usage.md
   - configuration.md
   - testing.md
