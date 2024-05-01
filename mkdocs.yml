@@ -12,7 +12,7 @@ nav:
   - thanks.md
 theme:
   name: material
-  favicon: favicon.ico
+  favicon: favicon.svg
   icon:
     logo: fontawesome/solid/shield-halved
     repo: fontawesome/brands/git-alt
