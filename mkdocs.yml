@@ -5,13 +5,10 @@ repo_name: pogo-migrate
 repo_url: https://github.com/NRWLDev/pogo-migrate
 nav:
   - index.md
-  # - why-pogo.md
-  # - getting-started.md
-  # - usage.md
-  # - configuration.md
-  # - strict-mode.md
-  # - tach-ignore.md
-  # - faq.md
+  - usage.md
+  - configuration.md
+  - testing.md
+  - thanks.md
 theme:
   name: material
   favicon: favicon.ico
