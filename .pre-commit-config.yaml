@@ -29,4 +29,6 @@ repos:
     rev: v1.3.1
     hooks:
       - id: remove-crlf
+        exclude: docs
       - id: remove-tabs
+        exclude: docs
