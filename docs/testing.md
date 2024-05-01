@@ -20,6 +20,6 @@ async def _engine(config):  # noqa: PT005
     await pogo_migrate.testing.rollback(db)
 ```
 
-Alternatively add `pytest-pogo` to your test dependencies and use the provided
-fixture `pogo_engine` which will apply and rollback your migrations for your
-test session, like the above example.
+Alternatively add [pytest-pogo](https://pypi.org/project/pytest-pogo) to your
+test dependencies and use the provided fixture `pogo_engine` which will apply
+and rollback your migrations for your test session, like the above example.
