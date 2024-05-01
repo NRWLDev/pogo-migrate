@@ -100,7 +100,9 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # os: [ubuntu-latest, macos-latest, windows-latest]
+        # skip macos latest until fix for setup-postgres available
+        os: [ubuntu-latest, windows-latest]
         version: ["3.9.x", "3.10.x", "3.11.x", "3.12.x"]
 
     steps:
