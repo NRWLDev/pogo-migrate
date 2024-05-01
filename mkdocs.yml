@@ -14,7 +14,7 @@ theme:
   name: material
   favicon: favicon.svg
   icon:
-    logo: fontawesome/solid/shield-halved
+    logo: fontawesome/solid/database
     repo: fontawesome/brands/git-alt
   features:
     - navigation.instant
