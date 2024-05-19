@@ -582,7 +582,7 @@ class TestApply:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["apply", "-v"])
+        result = cli_runner.invoke(["apply", "-vv"])
         assert result.exit_code == 1, result.output
         assert 'DuplicateTableError: relation "table_one" already exists' in result.output
 
@@ -682,7 +682,7 @@ class TestRollback:
             DROP TABLE table_one;
             """),
         )
-        result = cli_runner.invoke(["rollback", "-v"])
+        result = cli_runner.invoke(["rollback", "-vv"])
         assert result.exit_code == 1, result.output
         assert 'UndefinedTableError: table "table_one" does not exist' in result.output
 

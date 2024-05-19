@@ -129,7 +129,7 @@ def handle_exceptions(verbose: int) -> t.Callable[t.Callable[P, t.Awaitable[R]],
             except typer.Exit:
                 raise
             except Exception as e:  # noqa: BLE001
-                log = logger.exception if verbose else logger.error
+                log = logger.exception if verbose > 1 else logger.error
                 log(str(e))
                 raise typer.Exit(code=1) from e
 
