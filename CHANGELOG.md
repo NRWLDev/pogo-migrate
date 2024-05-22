@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.15rc0 (released 2024-05-22)
+
+### Bug fixes
+
+- Reduce verbosity of apply/rollback to prevent excess information in failed tests [[#9](https://github.com/NRWLDev/pogo-migrate/issues/9)] [[2b1da1c](https://github.com/NRWLDev/pogo-migrate/commit/2b1da1c4ed90aa08d13b9eb49e86ccb14aa3cd97)]
+
 ## v0.0.14 (released 2024-04-16)
 
 ### Features and Improvements
