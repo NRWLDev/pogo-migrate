@@ -508,7 +508,7 @@ class TestApply:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["apply"])
+        result = cli_runner.invoke(["apply", "-v"])
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
@@ -544,7 +544,7 @@ class TestApply:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["apply"])
+        result = cli_runner.invoke(["apply", "-v"])
         assert result.exit_code == 1, result.output
         cli_runner.assert_output(
             dedent("""\
@@ -582,7 +582,7 @@ class TestApply:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["apply", "-v"])
+        result = cli_runner.invoke(["apply", "-vv"])
         assert result.exit_code == 1, result.output
         assert 'DuplicateTableError: relation "table_one" already exists' in result.output
 
@@ -628,7 +628,7 @@ class TestRollback:
             DROP TABLE table_two;
             """),
         )
-        result = cli_runner.invoke(["rollback", "--count", "-1"])
+        result = cli_runner.invoke(["rollback", "--count", "-1", "-v"])
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
@@ -656,7 +656,7 @@ class TestRollback:
             DROP TABLE table_three;
             """),
         )
-        result = cli_runner.invoke(["rollback"])
+        result = cli_runner.invoke(["rollback", "-v"])
         assert result.exit_code == 1, result.output
         cli_runner.assert_output(
             dedent("""\
@@ -682,7 +682,7 @@ class TestRollback:
             DROP TABLE table_one;
             """),
         )
-        result = cli_runner.invoke(["rollback", "-v"])
+        result = cli_runner.invoke(["rollback", "-vv"])
         assert result.exit_code == 1, result.output
         assert 'UndefinedTableError: table "table_one" does not exist' in result.output
 

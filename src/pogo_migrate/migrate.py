@@ -24,7 +24,7 @@ async def apply(config: Config, db: asyncpg.Connection) -> None:
             for migration in migrations:
                 migration.load()
                 if not migration.applied:
-                    logger.error("Applying %s", migration.id)
+                    logger.warning("Applying %s", migration.id)
                     await migration.apply(db)
                     await sql.migration_applied(db, migration.id, migration.hash)
         except Exception as e:  # noqa: BLE001
@@ -43,7 +43,7 @@ async def rollback(config: Config, db: asyncpg.Connection, count: int | None = N
             for migration in migrations:
                 migration.load()
                 if migration.applied and (count is None or i < count):
-                    logger.error("Rolling back %s", migration.id)
+                    logger.warning("Rolling back %s", migration.id)
                     await migration.rollback(db)
                     await sql.migration_unapplied(db, migration.id)
                     i += 1
