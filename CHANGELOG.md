@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.0.15rc0 (released 2024-05-22)
+## v0.0.15 (released 2024-05-22)
 
 ### Bug fixes
 

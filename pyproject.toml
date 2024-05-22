@@ -56,21 +56,6 @@ nest-asyncio = "^1.6.0"
 current_version = "0.0.15rc0"
 commit = true
 tag = true
-parse = '''(?x)
-    (?P<major>0|[1-9]\d*)\.
-    (?P<minor>0|[1-9]\d*)\.
-    (?P<patch>0|[1-9]\d*)
-    (?:
-        (?P<release>rc)               # pre-release label
-        (?P<build>0|[1-9]\d*)         # pre-release version number
-    )?                                # pre-release section is optional
-'''
-serialize = [
-    "{major}.{minor}.{patch}{release}{build}",
-    "{major}.{minor}.{patch}",
-]
-parts.release.values = ["rc", "final"]
-parts.release.optional_value = "final"
 
 [[tool.bumpversion.files]]
 filename = "pyproject.toml"
