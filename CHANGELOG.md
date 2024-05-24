@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.16 (released 2024-05-24)
+
+### Bug fixes
+
+- Skip trailing comments as they break db.execute [[#11](https://github.com/NRWLDev/pogo-migrate/issues/11)] [[9d6c674](https://github.com/NRWLDev/pogo-migrate/commit/9d6c6747abe251ebf5e5402a137e1e607ba901c9)]
+
 ## v0.0.15 (released 2024-05-22)
 
 ### Bug fixes
