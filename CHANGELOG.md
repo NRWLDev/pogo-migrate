@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.17 (released 2024-05-24)
+
+### Bug fixes
+
+- Ignore comments, not statements preceded by a comment. [[57fcede](https://github.com/NRWLDev/pogo-migrate/commit/57fcede53eca0dd782e94684e748a606c9fcbc3d)]
+
 ## v0.0.16 (released 2024-05-24)
 
 ### Bug fixes
