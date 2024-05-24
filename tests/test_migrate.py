@@ -43,8 +43,14 @@ def _migration_two(migrations, _migration_one):
 -- migrate: apply
 CREATE TABLE table_two();
 
+-- Auto generated
+-- From psql
+
 -- migrate: rollback
 DROP TABLE table_two;
+
+-- Auto generated
+-- From psql
 """)
 
 

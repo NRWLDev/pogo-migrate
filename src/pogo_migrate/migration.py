@@ -50,13 +50,17 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
 
         async def apply(db):  # noqa: ANN001, ANN202
             for statement in apply_statements:
-                await db.execute(statement)
+                # Skip comments
+                if statement and not statement.startswith("--"):
+                    await db.execute(statement)
 
         rollback_statements = sqlparse.split(rollback_content.strip())
 
         async def rollback(db):  # noqa: ANN001, ANN202
             for statement in rollback_statements:
-                await db.execute(statement)
+                # Skip comments
+                if statement and not statement.startswith("--"):
+                    await db.execute(statement)
 
         return message, depends, apply, rollback
 
