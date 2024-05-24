@@ -18,6 +18,10 @@ if t.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def strip_comments(statement: str) -> str:
+    return "\n".join([line for line in statement.split("\n") if not line.startswith("--")])
+
+
 def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
     """Read a sql migration.
 
@@ -51,16 +55,18 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
         async def apply(db):  # noqa: ANN001, ANN202
             for statement in apply_statements:
                 # Skip comments
-                if statement and not statement.startswith("--"):
-                    await db.execute(statement)
+                statement_ = strip_comments(statement)
+                if statement_:
+                    await db.execute(statement_)
 
         rollback_statements = sqlparse.split(rollback_content.strip())
 
         async def rollback(db):  # noqa: ANN001, ANN202
             for statement in rollback_statements:
                 # Skip comments
-                if statement and not statement.startswith("--"):
-                    await db.execute(statement)
+                statement_ = strip_comments(statement)
+                if statement_:
+                    await db.execute(statement_)
 
         return message, depends, apply, rollback
 

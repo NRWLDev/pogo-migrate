@@ -47,10 +47,10 @@ CREATE TABLE table_two();
 -- From psql
 
 -- migrate: rollback
-DROP TABLE table_two;
 
 -- Auto generated
 -- From psql
+DROP TABLE table_two;
 """)
 
 
