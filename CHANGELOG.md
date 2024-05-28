@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.18 (released 2024-05-28)
+
+### Features and Improvements
+
+- Ability to flag a specific migration to not be run in a transaction, support INDEX CONCURRENTLY. [[7ebdbf7](https://github.com/NRWLDev/pogo-migrate/commit/7ebdbf759278841f0e328d5b70b2f1dee0cba9fa)]
+
 ## v0.0.17 (released 2024-05-24)
 
 ### Bug fixes
