@@ -22,7 +22,7 @@ def strip_comments(statement: str) -> str:
     return "\n".join([line for line in statement.split("\n") if not line.startswith("--")])
 
 
-def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
+def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable, bool]:
     """Read a sql migration.
 
     Parse the message, [depends], apply statements, and rollback statements.
@@ -43,6 +43,7 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
 
         message = m[1].strip()
         depends = m[2].strip()
+        use_transaction = "-- transaction: false" not in metadata
 
         try:
             apply_content, rollback_content = contents.split("-- migrate: rollback")
@@ -68,7 +69,7 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable]:
                 if statement_:
                     await db.execute(statement_)
 
-        return message, depends, apply, rollback
+        return message, depends, apply, rollback, use_transaction
 
 
 class Migration:
@@ -79,6 +80,7 @@ class Migration:
         self.id = mig_id
         self.path = path
         self.hash = hashlib.sha256(mig_id.encode("utf-8")).hexdigest() if mig_id else None
+        self._use_transaction: bool = True
         self._doc: str | None = None
         self._depends: set[Migration] | None = None
         self._apply: t.Awaitable | None = None
@@ -98,6 +100,10 @@ class Migration:
         return self._depends
 
     @property
+    def use_transaction(self: t.Self) -> bool:
+        return self._use_transaction
+
+    @property
     def depends_ids(self: t.Self) -> set[str]:
         return {m.id for m in self._depends}
 
@@ -114,10 +120,11 @@ class Migration:
     def load(self: t.Self) -> Migration:
         depends_ = []
         if self.is_sql:
-            message, depends, apply, rollback = read_sql_migration(self.path)
+            message, depends, apply, rollback, in_transaction = read_sql_migration(self.path)
             self._doc = message
             self._apply = apply
             self._rollback = rollback
+            self._use_transaction = in_transaction
             depends_ = depends.split()
         else:
             spec = importlib.util.spec_from_file_location(
@@ -138,6 +145,7 @@ class Migration:
                 depends_ = module.__depends__
                 self._apply = module.apply
                 self._rollback = module.rollback
+                self._use_transaction = getattr(module, "__transaction__", True)
             else:
                 msg = f"Could not import migration from '{self.path.name}': ModuleSpec has no loader attached"
                 raise exceptions.BadMigrationError(msg)

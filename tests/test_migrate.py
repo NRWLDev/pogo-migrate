@@ -64,7 +64,7 @@ def _broken_apply(migrations, _migration_two):
 -- depends: 20240317_02_12345-second-migration
 
 -- migrate: apply
-CREATE TABLE table_two();
+CREATE TABLE table_three;
 
 -- migrate: rollback
 DROP TABLE table_two;
@@ -122,11 +122,11 @@ class TestApply(Base):
         await self.assert_tables(db_session, ["_pogo_migration", "_pogo_version", "table_one", "table_two"])
 
     @pytest.mark.usefixtures("_broken_apply")
-    async def test_broken_migration_rollsback(self, config, db_session):
+    async def test_broken_migration_not_applied(self, config, db_session):
         with pytest.raises(exceptions.BadMigrationError) as e:
             await migrate.apply(config, db_session)
 
-        await self.assert_tables(db_session, ["_pogo_migration", "_pogo_version"])
+        await self.assert_tables(db_session, ["_pogo_migration", "_pogo_version", "table_one", "table_two"])
         assert str(e.value) == "Failed to apply 20240318_01_12345-broken-apply"
 
 

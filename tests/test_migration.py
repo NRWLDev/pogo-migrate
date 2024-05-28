@@ -72,7 +72,7 @@ class TestReadSqlMigration:
             -- migrate: rollback
             """),
         )
-        message, depends, _, _ = migration.read_sql_migration(mp)
+        message, depends, _, _, _ = migration.read_sql_migration(mp)
 
     async def test_apply_func_created(self, migration_file_factory):
         mp = migration_file_factory(
@@ -93,7 +93,7 @@ class TestReadSqlMigration:
             -- migrate: rollback
             """),
         )
-        _, _, apply, _ = migration.read_sql_migration(mp)
+        _, _, apply, _, _ = migration.read_sql_migration(mp)
 
         db = mock.Mock(execute=AsyncMock())
         await apply(db)
@@ -132,7 +132,7 @@ class TestReadSqlMigration:
             );
             """),
         )
-        _, _, _, rollback = migration.read_sql_migration(mp)
+        _, _, _, rollback, _ = migration.read_sql_migration(mp)
         db = mock.Mock(execute=AsyncMock())
         await rollback(db)
         assert db.execute.call_args_list == [
@@ -147,6 +147,34 @@ class TestReadSqlMigration:
             );"""),
             ),
         ]
+
+    @pytest.mark.parametrize(
+        ("flag", "expected"),
+        [
+            ("", True),
+            ("-- transaction: false", False),
+            ("-- transaction: true", True),
+        ],
+    )
+    async def test_transaction_flag(self, migration_file_factory, flag, expected):
+        mp = migration_file_factory(
+            "20210101_01_rando-migration-message",
+            "sql",
+            dedent(f"""
+            -- migration message
+            -- depends:
+            {flag}
+
+            -- migrate: apply
+            CREATE TABLE table_one();
+
+            -- migrate: rollback
+            DROP TABLE table_one;
+
+            """),
+        )
+        _, _, _, _, in_transaction = migration.read_sql_migration(mp)
+        assert in_transaction == expected
 
 
 class TestMigration:
@@ -302,6 +330,7 @@ class TestMigration:
             migration message
             """
             __depends__ = []
+            __transaction__ = False
 
             async def apply(db):
                 await db.execute("CREATE TABLE table_one();")
@@ -314,6 +343,7 @@ class TestMigration:
         )
         m = migration.Migration(mp.stem, mp, set())
         m.load()
+        assert m._use_transaction is False
         assert m._doc == "migration message"
         assert inspect.getsource(m._apply) == dedent("""\
         async def apply(db):

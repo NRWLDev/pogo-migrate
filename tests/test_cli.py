@@ -540,7 +540,7 @@ class TestApply:
             -- depends: 20210101_01_rando-commit
 
             -- migrate: apply
-            CREATE TABLE table_one()
+            CREATE TABLE table_two
             -- migrate: rollback
             """),
         )
@@ -554,7 +554,7 @@ class TestApply:
             """),
         )
 
-        await self.assert_tables(db_session, [])
+        await self.assert_tables(db_session, ["table_one"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     def test_apply_failure_verbose(self, cli_runner, migration_file_factory):
