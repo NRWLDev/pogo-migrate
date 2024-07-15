@@ -458,6 +458,42 @@ def rollback(
     asyncio.run(rollback_())
 
 
+@app.command("squash")
+def squash(
+    migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
+    # database: str = typer.Option(None, "-d", "--database", help="Database connection string."),
+    *,
+    verbose: int = typer.Option(
+        0,
+        "-v",
+        "--verbose",
+        help="Verbose output. Use multiple times to increase level of verbosity.",
+        count=True,
+        max=3,
+    ),
+) -> None:
+    # @handle_exceptions(verbose)
+    # async def sqaush_() -> None:
+    #     if dotenv:  # pragma: no cover
+    #         load_dotenv()
+    #     config = load_config()
+    #
+    #     connection_string = database or config.database_dsn
+    #     db = await sql.get_connection(connection_string)
+    #
+    #     await migrate.apply(config, db)
+
+    setup_logging(verbose)
+    migrations = [
+        Migration(path.stem, path, []) for path in Path(migrations_location).iterdir() if path.suffix in {".py", ".sql"}
+    ]
+    migrations = topological_sort([m.load() for m in migrations])
+    for migration in migrations:
+        logger.error(migration.is_sql)
+        logger.error(migration)
+    # asyncio.run(squash())
+
+
 @app.command("mark")
 def mark(
     database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
