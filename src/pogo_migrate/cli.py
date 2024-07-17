@@ -498,8 +498,8 @@ def remove(
 def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
     migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
     *,
-    backup: bool = typer.Option(False, "--backup/ ", help="Keep original files."),  # noqa: FBT003
-    source: bool = typer.Option(False, "--source/ ", help="Add comments for statements source migration."),  # noqa: FBT003
+    backup: bool = typer.Option(False, "--backup/ ", help="Keep .bak copy of original files."),  # noqa: FBT003
+    source: bool = typer.Option(False, "--source/ ", help="Add comment for source migration to each statement."),  # noqa: FBT003
     prompt_update: bool = typer.Option(False, "--update-prompt/ ", help="Confirm before including UPDATE statements."),  # noqa: FBT003
     prompt_skip: bool = typer.Option(
         False,  # noqa: FBT003
@@ -515,6 +515,16 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         max=3,
     ),
 ) -> None:
+    """[EXPERIMENTAL] Squash migrations.
+
+    Python migrations and non transaction based transactions are skipped by default.
+
+    Statements in sql migrations are grouped by table, and applied in the order
+    tables where discovered.
+
+    Rollback statements follow the reverse logic, the last table discovered is
+    grouped first.
+    """
     setup_logging(verbose)
     migrations = [
         Migration(path.stem, path, []) for path in Path(migrations_location).iterdir() if path.suffix in {".py", ".sql"}
