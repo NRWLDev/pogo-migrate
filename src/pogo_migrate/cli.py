@@ -593,6 +593,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
 
             else:
                 logger.debug(parsed.get_type())
+                keep = True
                 if type_ == "UPDATE" and prompt_update:
                     logger.error("")
                     with contextlib.suppress(IndexError):
@@ -601,8 +602,10 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                     with contextlib.suppress(IndexError):
                         logger.error("   %s", apply_statements[i + 1])
                     logger.error("")
-                    typer.confirm("Include update statement", default=True)
-                applies["__data"].append(apply)
+                    keep = typer.confirm("Include update statement", default=True)
+                if keep:
+                    applies["__data"].append(apply)
+
         rollbacks_ = defaultdict(list)
         for rollback in reversed(rollback_statements):
             parsed = sqlparse.parse(rollback)[0]

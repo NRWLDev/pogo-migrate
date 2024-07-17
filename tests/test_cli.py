@@ -1118,7 +1118,9 @@ class TestSquash:
 
             -- migrate: apply
             CREATE TABLE one (id INT);
+            INSERT INTO one (id) VALUES (1);
             -- migrate: rollback
+            DELETE FROM one;
             DROP TABLE one;
             """),
         )
@@ -1131,7 +1133,9 @@ class TestSquash:
 
             -- migrate: apply
             CREATE TABLE two (id INT);
+            UPDATE one SET id = 2;
             -- migrate: rollback
+            UPDATE one SET id = 1;
             DROP TABLE two;
             """),
         )
@@ -1156,6 +1160,82 @@ class TestSquash:
 
         CREATE TABLE two (id INT);
 
+        -- Squash data statements.
+
+        INSERT INTO one (id) VALUES (1);
+
+        UPDATE one SET id = 2;
+
+        -- migrate: rollback
+
+        -- Squash data statements.
+
+        UPDATE one SET id = 1;
+
+        DELETE FROM one;
+
+        -- Squash two statements.
+
+        DROP TABLE two;
+
+        -- Squash one statements.
+
+        DROP TABLE one;
+        """)
+
+    def test_prompt_update(self, migration_file_factory, cli_runner):
+        migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE one (id INT);
+            UPDATE one SET id = 1;
+            -- migrate: rollback
+            DROP TABLE one;
+            """),
+        )
+        new = migration_file_factory(
+            "20210101_02_efgh-second-migration",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_abcd-first-migration
+
+            -- migrate: apply
+            CREATE TABLE two (id INT);
+            UPDATE one SET id = 2;
+            -- migrate: rollback
+            DROP TABLE two;
+            """),
+        )
+
+        result = cli_runner.invoke(["squash", "--update-prompt"], input="\nn\n")
+        assert result.exit_code == 0, result.output
+
+        assert new.read_text() == dedent("""\
+        -- commit
+        -- depends:
+
+        -- squashed: 20210101_01_abcd-first-migration
+
+        -- migrate: apply
+
+        -- Squash one statements.
+
+        CREATE TABLE one (id INT);
+
+        -- Squash two statements.
+
+        CREATE TABLE two (id INT);
+
+        -- Squash data statements.
+
+        UPDATE one SET id = 1;
+
         -- migrate: rollback
 
         -- Squash two statements.
@@ -1178,9 +1258,7 @@ class TestSquash:
             -- migrate: apply
             CREATE TABLE one (id INT);
 
-            INSERT INTO one (id) VALUES 1;
             -- migrate: rollback
-            DELETE FROM one;
             DROP TABLE one;
             """),
         )
@@ -1297,6 +1375,57 @@ class TestSquash:
         )
 
         result = cli_runner.invoke(["squash"])
+        assert result.exit_code == 0, result.output
+
+        assert sorted([path.stem for path in migrations.iterdir() if path.suffix in {".py", ".sql"}]) == [
+            "20210101_01_abcd-first-migration",
+        ]
+
+    def test_view_and_remove_python_file(self, migration_file_factory, cli_runner, migrations):
+        migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "py",
+            dedent('''
+            """
+            first migration
+            """
+            __depends__ = []
+            __transaction__ = False
+
+            async def apply(db):
+                await db.execute("CREATE TABLE two();")
+
+            async def rollback(db):
+                await db.execute("DROP TABLE two;")
+            '''),
+        )
+
+        result = cli_runner.invoke(["squash", "--skip-prompt"], input="y\ny\n")
+        assert result.exit_code == 0, result.output
+        assert result.output == ""
+
+        assert sorted([path.stem for path in migrations.iterdir() if path.suffix in {".py", ".sql"}]) == []
+
+    def test_keep_python_file(self, migration_file_factory, cli_runner, migrations):
+        migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "py",
+            dedent('''
+            """
+            first migration
+            """
+            __depends__ = []
+            __transaction__ = False
+
+            async def apply(db):
+                await db.execute("CREATE TABLE two();")
+
+            async def rollback(db):
+                await db.execute("DROP TABLE two;")
+            '''),
+        )
+
+        result = cli_runner.invoke(["squash", "--skip-prompt"], input="n\nn\n")
         assert result.exit_code == 0, result.output
 
         assert sorted([path.stem for path in migrations.iterdir() if path.suffix in {".py", ".sql"}]) == [
