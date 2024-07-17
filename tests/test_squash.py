@@ -1,0 +1,475 @@
+from textwrap import dedent
+
+from pogo_migrate import migration, squash
+
+
+def test_remove_no_dependent(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends:
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m.load()
+
+    squash.remove(m, None)
+
+    assert mp.exists() is False
+
+
+def test_remove_no_parent_with_dependent(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends:
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+    mp2 = migration_file_factory(
+        "20210101_02_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends: 20210101_01_rando-commit
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m2 = migration.Migration(mp2.stem, mp2, None)
+
+    m.load()
+    m2.load()
+
+    squash.remove(m, m2)
+
+    assert m2.depends == set()
+
+
+def test_remove_python_no_parent_with_dependent(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-migration-message",
+        "py",
+        dedent('''
+        """
+        migration message
+        """
+        __depends__ = []
+        __transaction__ = False
+
+        async def apply(db):
+            await db.execute("CREATE TABLE table_one();")
+            await db.execute("CREATE TABLE table_two();")
+
+        async def rollback(db):
+            await db.execute("DROP TABLE table_two;")
+            await db.execute("DROP TABLE table_one;")
+        '''),
+    )
+    mp2 = migration_file_factory(
+        "20210101_02_rando-migration-message",
+        "py",
+        dedent('''
+        """
+        migration message
+        """
+        __depends__ = ["20210101_01_rando-migration-message"]
+        __transaction__ = False
+
+        async def apply(db):
+            await db.execute("CREATE TABLE table_one();")
+            await db.execute("CREATE TABLE table_two();")
+
+        async def rollback(db):
+            await db.execute("DROP TABLE table_two;")
+            await db.execute("DROP TABLE table_one;")
+        '''),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m2 = migration.Migration(mp2.stem, mp2, None)
+
+    m.load()
+    m2.load()
+
+    squash.remove(m, m2)
+
+    assert m2.depends == set()
+
+
+def test_remove_with_parent_with_dependent(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends:
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+    mp2 = migration_file_factory(
+        "20210101_02_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends: 20210101_01_rando-commit
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+    mp3 = migration_file_factory(
+        "20210101_03_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends: 20210101_02_rando-commit
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m2 = migration.Migration(mp2.stem, mp2, None)
+    m3 = migration.Migration(mp3.stem, mp3, None)
+
+    m.load()
+    m2.load()
+    m3.load()
+
+    squash.remove(m2, m3)
+
+    assert m3.depends == {m}
+
+
+def test_write_short_circuits_for_file_squashed_to_self():
+    latest = migration.Migration("mig-id", "path", None)
+    new = squash.write({}, {}, latest, None, [latest.id])
+    assert new is None
+
+
+def test_squash_file_created(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends:
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m.load()
+
+    new = squash.write({}, {}, m, None, ["squash-1", "squash-2"])
+
+    assert str(new.path) == f"{m.path}.squash"
+
+
+def test_message_maintained(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends:
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m.load()
+
+    new = squash.write({}, {}, m, None, ["squash-1", "squash-2"])
+
+    content = new.path.read_text()
+    assert content.startswith("-- commit")
+
+
+def test_depends_updated(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends:
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m.load()
+
+    new = squash.write({}, {}, m, "previous-1", ["squash-1", "squash-2"])
+
+    content = new.path.read_text()
+    assert "-- depends: previous-1" in content
+
+
+def test_squashed_migrations_tracked(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends:
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m.load()
+
+    new = squash.write({}, {}, m, "previous-1", ["squash-1", "squash-2", m.id])
+
+    content = new.path.read_text()
+    assert "-- squashed: squash-1" in content
+    assert "-- squashed: squash-2" in content
+
+
+def test_apply_statements_stored_in_order(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends:
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m.load()
+
+    apply_statements = {
+        "table1": ["statement1", "statement2"],
+        "table2": ["statement3", "statement4"],
+    }
+    new = squash.write(apply_statements, {}, m, "previous-1", ["squash-1", "squash-2", m.id])
+
+    content = new.path.read_text()
+    assert (
+        dedent("""
+    -- migrate: apply
+
+    -- Squash table1 statements.
+
+    statement1
+
+    statement2
+
+    -- Squash table2 statements.
+
+    statement3
+
+    statement4
+
+    -- migrate: rollback
+    """)
+        in content
+    )
+
+
+def test_apply_data_statements_last(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends:
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m.load()
+
+    apply_statements = {
+        "table1": ["statement1"],
+        "__data": ["update", "insert", "delete"],
+    }
+    new = squash.write(apply_statements, {}, m, "previous-1", ["squash-1", "squash-2", m.id])
+
+    content = new.path.read_text()
+    assert (
+        dedent("""
+    -- migrate: apply
+
+    -- Squash table1 statements.
+
+    statement1
+
+    -- Squash data statements.
+
+    update
+
+    insert
+
+    delete
+
+    -- migrate: rollback
+    """)
+        in content
+    )
+
+
+def test_rollback_statements_reversed_from_discovery_order(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends:
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m.load()
+
+    # Rollback statements are found in file order, in reverse statement order
+    """
+    file1:
+    ALTER table2 DROP COLUMN a;
+    DROP table2;
+    ALTER table1 DROP COLUMN e;
+    DROP table1;
+
+    file2:
+    ALTER table2 DROP COLUMN c;
+    ALTER table2 DROP COLUMN d;
+    ALTER table1 DROP COLUMN f;
+    ALTER table1 DROP COLUMN g;
+    """
+
+    rollback_statements = {
+        "table1": [
+            ["DROP table1;", "ALTER table1 DROP COLUMN e;"],
+            ["ALTER table1 DROP COLUMN g;", "ALTER table1 DROP COLUMN f;"],
+        ],
+        "table2": [
+            ["DROP table2;", "ALTER table2 DROP COLUMN a;"],
+            ["ALTER table2 DROP COLUMN d;", "ALTER table2 DROP COLUMN c;"],
+        ],
+    }
+    new = squash.write({}, rollback_statements, m, "previous-1", ["squash-1", "squash-2", m.id])
+
+    content = new.path.read_text()
+    # Rolback statements should be applied last discovered to first
+    assert (
+        dedent("""
+    -- migrate: rollback
+
+    -- Squash table2 statements.
+
+    ALTER table2 DROP COLUMN c;
+
+    ALTER table2 DROP COLUMN d;
+
+    ALTER table2 DROP COLUMN a;
+
+    DROP table2;
+
+    -- Squash table1 statements.
+
+    ALTER table1 DROP COLUMN f;
+
+    ALTER table1 DROP COLUMN g;
+
+    ALTER table1 DROP COLUMN e;
+
+    DROP table1;
+    """)
+        in content
+    )
+
+
+def test_rollback_data_statements_first_reversed_from_discovery_order(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends:
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m.load()
+
+    # Rollback statements are found in file order, in reverse statement order
+    """
+    file1:
+    UPDATE table1;
+    DELETE FROM table1;
+    DROP table1;
+
+    file2:
+    INSERT INTO table1;
+    """
+
+    rollback_statements = {
+        "table1": [
+            ["DROP table1;"],
+        ],
+        "__data": [
+            ["DELETE FROM table1;", "UPDATE table1;"],
+            ["INSERT INTO table1;"],
+        ],
+    }
+    new = squash.write({}, rollback_statements, m, "previous-1", ["squash-1", "squash-2", m.id])
+
+    content = new.path.read_text()
+    # Rolback statements should be applied last discovered to first
+    assert (
+        dedent("""
+    -- migrate: rollback
+
+    -- Squash data statements.
+
+    INSERT INTO table1;
+
+    UPDATE table1;
+
+    DELETE FROM table1;
+
+    -- Squash table1 statements.
+
+    DROP table1;
+    """)
+        in content
+    )
