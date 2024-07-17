@@ -331,7 +331,7 @@ class TestHistory:
         )
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    def test_migrations_not_applied(self, migration_file_factory, cli_runner):
+    def test_migrations_nono_config(self, migration_file_factory, cli_runner):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -358,6 +358,44 @@ class TestHistory:
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
+            STATUS    ID                        FORMAT
+            --------  ------------------------  --------
+            U         20210101_02_rando-commit  sql
+            U         20210101_01_rando-commit  sql
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    def test_migrations_not_applied(self, migration_file_factory, cli_runner, monkeypatch):
+        monkeypatch.delenv("POSTGRES_DSN")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_02_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["history", "-v"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Database connection can not be established, migration status can not be
+            determined.
             STATUS    ID                        FORMAT
             --------  ------------------------  --------
             U         20210101_02_rando-commit  sql
@@ -992,3 +1030,393 @@ class TestMigrateYoyo:
             'migrations/20210101_01_rando-commit.py'.
             """),
         )
+
+
+class TestRemove:
+    def test_migration_removed_from_chain(self, migration_file_factory, cli_runner):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_02_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        mp = migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+
+        result = cli_runner.invoke(["remove", "20210101_02_rando"])
+        assert result.exit_code == 0, result.output
+
+        assert mp.exists() is False
+
+
+class TestClean:
+    def test_bak_files_removed(self, migration_file_factory, cli_runner):
+        b1 = migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql.bak",
+            dedent("""
+            -- commit
+            -- depends: 20210101_02_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        b2 = migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql.bak",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        mp = migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+
+        result = cli_runner.invoke(["clean"])
+        assert result.exit_code == 0, result.output
+
+        assert b1.exists() is False
+        assert b2.exists() is False
+        assert mp.exists() is True
+
+
+class TestSquash:
+    def test_simple_squash_all_sql(self, migration_file_factory, cli_runner):
+        old = migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE one (id INT);
+            -- migrate: rollback
+            DROP TABLE one;
+            """),
+        )
+        new = migration_file_factory(
+            "20210101_02_efgh-second-migration",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_abcd-first-migration
+
+            -- migrate: apply
+            CREATE TABLE two (id INT);
+            -- migrate: rollback
+            DROP TABLE two;
+            """),
+        )
+
+        result = cli_runner.invoke(["squash", "-vvv"])
+        assert result.exit_code == 0, result.output
+
+        assert old.exists() is False
+        assert new.read_text() == dedent("""\
+        -- commit
+        -- depends:
+
+        -- squashed: 20210101_01_abcd-first-migration
+
+        -- migrate: apply
+
+        -- Squash one statements.
+
+        CREATE TABLE one (id INT);
+
+        -- Squash two statements.
+
+        CREATE TABLE two (id INT);
+
+        -- migrate: rollback
+
+        -- Squash two statements.
+
+        DROP TABLE two;
+
+        -- Squash one statements.
+
+        DROP TABLE one;
+        """)
+
+    def test_python_and_non_transaction_skipped(self, migration_file_factory, cli_runner, migrations):
+        migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "sql",
+            dedent("""
+            -- first migration
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE one (id INT);
+
+            INSERT INTO one (id) VALUES 1;
+            -- migrate: rollback
+            DELETE FROM one;
+            DROP TABLE one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_efgh-second-migration",
+            "py",
+            dedent('''
+            """
+            second migration
+            """
+            __depends__ = ["20210101_01_abcd-first-migration"]
+            __transaction__ = False
+
+            async def apply(db):
+                await db.execute("CREATE TABLE two();")
+
+            async def rollback(db):
+                await db.execute("DROP TABLE two;")
+            '''),
+        )
+        migration_file_factory(
+            "20210101_03_ijkl-third-migration",
+            "sql",
+            dedent("""
+            -- third migration
+            -- depends: 20210101_02_efgh-second-migration
+
+            -- migrate: apply
+            CREATE TABLE three (id INT);
+            -- migrate: rollback
+            DROP TABLE three;
+            """),
+        )
+        new = migration_file_factory(
+            "20210101_04_mnop-fourth-migration",
+            "sql",
+            dedent("""
+            -- fourth migration
+            -- depends: 20210101_03_ijkl-third-migration
+
+            -- migrate: apply
+            CREATE TABLE four (id INT);
+            -- migrate: rollback
+            DROP TABLE four;
+            """),
+        )
+        migration_file_factory(
+            "20210102_01_abcd-fifth-migration",
+            "sql",
+            dedent("""
+            -- fifth migration
+            -- depends: 20210101_04_mnop-fourth-migration
+
+            -- transaction: false
+
+            -- migrate: apply
+            CREATE TABLE five (id INT);
+            -- migrate: rollback
+            DROP TABLE five;
+            """),
+        )
+
+        result = cli_runner.invoke(["squash"])
+        assert result.exit_code == 0, result.output
+
+        assert new.read_text() == dedent("""\
+        -- fourth migration
+        -- depends: 20210101_02_efgh-second-migration
+
+        -- squashed: 20210101_03_ijkl-third-migration
+
+        -- migrate: apply
+
+        -- Squash three statements.
+
+        CREATE TABLE three (id INT);
+
+        -- Squash four statements.
+
+        CREATE TABLE four (id INT);
+
+        -- migrate: rollback
+
+        -- Squash four statements.
+
+        DROP TABLE four;
+
+        -- Squash three statements.
+
+        DROP TABLE three;
+        """)
+
+        assert sorted([path.stem for path in migrations.iterdir() if path.suffix in {".py", ".sql"}]) == [
+            "20210101_01_abcd-first-migration",
+            "20210101_02_efgh-second-migration",
+            "20210101_04_mnop-fourth-migration",
+            "20210102_01_abcd-fifth-migration",
+        ]
+
+    def test_skip_initial_file(self, migration_file_factory, cli_runner, migrations):
+        migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "sql",
+            dedent("""
+            -- first migration
+            -- depends:
+            -- transaction: false
+
+            -- migrate: apply
+            CREATE TABLE one (id INT);
+            -- migrate: rollback
+            DROP TABLE one;
+            """),
+        )
+
+        result = cli_runner.invoke(["squash"])
+        assert result.exit_code == 0, result.output
+
+        assert sorted([path.stem for path in migrations.iterdir() if path.suffix in {".py", ".sql"}]) == [
+            "20210101_01_abcd-first-migration",
+        ]
+
+    def test_single_squash_skipped(self, migration_file_factory, cli_runner, migrations):
+        migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "sql",
+            dedent("""
+            -- first migration
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE one (id INT);
+            -- migrate: rollback
+            DROP TABLE one;
+            """),
+        )
+
+        result = cli_runner.invoke(["squash"])
+        assert result.exit_code == 0, result.output
+
+        assert sorted([path.stem for path in migrations.iterdir() if path.suffix in {".py", ".sql"}]) == [
+            "20210101_01_abcd-first-migration",
+        ]
+
+    def test_backups_kept(self, migration_file_factory, cli_runner, migrations):
+        migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE one (id INT);
+            -- migrate: rollback
+            DROP TABLE one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_efgh-second-migration",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_abcd-first-migration
+
+            -- migrate: apply
+            CREATE TABLE two (id INT);
+            -- migrate: rollback
+            DROP TABLE two;
+            """),
+        )
+
+        result = cli_runner.invoke(["squash", "--backup"])
+        assert result.exit_code == 0, result.output
+
+        assert sorted([path.name for path in migrations.iterdir()]) == [
+            "20210101_01_abcd-first-migration.sql.bak",
+            "20210101_02_efgh-second-migration.sql",
+            "20210101_02_efgh-second-migration.sql.bak",
+        ]
+
+    def test_sources_tracked(self, migration_file_factory, cli_runner):
+        old = migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE one (id INT);
+            -- migrate: rollback
+            DROP TABLE one;
+            """),
+        )
+        new = migration_file_factory(
+            "20210101_02_efgh-second-migration",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_abcd-first-migration
+
+            -- migrate: apply
+            CREATE TABLE two (id INT);
+            -- migrate: rollback
+            DROP TABLE two;
+            """),
+        )
+
+        result = cli_runner.invoke(["squash", "--source"])
+        assert result.exit_code == 0, result.output
+
+        assert old.exists() is False
+        assert new.read_text() == dedent("""\
+        -- commit
+        -- depends:
+
+        -- squashed: 20210101_01_abcd-first-migration
+
+        -- migrate: apply
+
+        -- Squash one statements.
+
+        CREATE TABLE one (id INT); -- source: 20210101_01_abcd-first-migration
+
+        -- Squash two statements.
+
+        CREATE TABLE two (id INT); -- source: 20210101_02_efgh-second-migration
+
+        -- migrate: rollback
+
+        -- Squash two statements.
+
+        DROP TABLE two; -- source: 20210101_02_efgh-second-migration
+
+        -- Squash one statements.
+
+        DROP TABLE one; -- source: 20210101_01_abcd-first-migration
+        """)

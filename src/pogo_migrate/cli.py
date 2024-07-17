@@ -23,14 +23,14 @@ import tabulate
 import typer
 from rich.logging import RichHandler
 
-from pogo_migrate import migrate, sql, yoyo
+from pogo_migrate import exceptions, migrate, sql, squash, yoyo
 from pogo_migrate.config import Config, load_config
 from pogo_migrate.migration import Migration, read_sql_migration, topological_sort
 from pogo_migrate.util import get_editor, make_file
 
 if sys.version_info < (3, 10):
     from typing_extensions import ParamSpec
-else:
+else:  # pragma: no cover
     from typing import ParamSpec
 
 logger = logging.getLogger(__name__)
@@ -233,24 +233,6 @@ migration_sql_template = dedent(
 )
 
 
-squash_sql_template = dedent(
-    """\
-    --{message}
-    -- depends:{depends}
-
-    -- squashed: {squashed}
-
-    -- migrate: apply
-
-    {apply}
-
-    -- migrate: rollback
-
-    {rollback}
-    """,
-)
-
-
 def retry() -> str:
     choice = ""
     while choice == "":
@@ -392,8 +374,14 @@ def history(
             load_dotenv()
         config = load_config()
 
-        connection_string = database or config.database_dsn
-        db = await sql.get_connection(connection_string)
+        try:
+            connection_string = database or config.database_dsn
+        except exceptions.InvalidConfigurationError:
+            connection_string = database
+        db = await sql.get_connection(connection_string) if connection_string else None
+
+        if db is None:
+            logger.warning("Database connection can not be established, migration status can not be determined.")
 
         migrations = await sql.read_migrations(config.migrations, db)
         migrations = topological_sort([m.load() for m in migrations])
@@ -478,61 +466,46 @@ def rollback(
     asyncio.run(rollback_())
 
 
-def _write(
-    apply_statements: dict[str, list[str]],
-    rollback_statements: dict[str, list[list[str]]],
-    latest: Migration,
-    depends: str,
-    squashed: list[str],
-) -> Migration | None:
-    if squashed[0] == latest.id:
-        return None
-    path = Path(f"{latest.path}.squash")
-    template = squash_sql_template
-    depends = f" {depends}" if depends else ""
-    message = f" {latest.__doc__}"
-    # add comment for which migrations were squashed in
-    squashed = "\n-- squashed: ".join(squashed[:-1])
+@app.command("remove")
+def remove(
+    migration_id: str = typer.Argument(show_default=False, help="Migration id to remove (message can be excluded)."),
+    migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
+    *,
+    verbose: int = typer.Option(
+        0,
+        "-v",
+        "--verbose",
+        help="Verbose output. Use multiple times to increase level of verbosity.",
+        count=True,
+        max=3,
+    ),
+) -> None:
+    setup_logging(verbose)
+    migrations = [
+        Migration(path.stem, path, []) for path in Path(migrations_location).iterdir() if path.suffix in {".py", ".sql"}
+    ]
+    migrations = topological_sort([m.load() for m in migrations])
+    for i, migration in enumerate(migrations):
+        if migration.id.startswith(migration_id):
+            next_migration = None
+            with contextlib.suppress(IndexError):
+                next_migration = migrations[i + 1]
 
-    apply = []
-    for ident, statements_ in apply_statements.items():
-        if ident == "__data":
-            continue
-        apply.append(f"-- Squash {ident} statements.")
-        apply.extend(statements_)
-    apply.append("-- Squash data statements.")
-    apply.extend(apply_statements.get("__data", []))
-
-    rollback = []
-    rollback.append("-- Squash data statements.")
-    for data_statements in reversed(rollback_statements.get("__data", [])):
-        rollback.extend(reversed(data_statements))
-
-    for ident, statements_ in reversed(rollback_statements.items()):
-        if ident == "__data":
-            continue
-        rollback.append(f"-- Squash {ident} statements.")
-        for migration_statements in reversed(statements_):
-            rollback.extend(reversed(migration_statements))
-
-    content = template.format(
-        message=message,
-        depends=depends,
-        apply="\n\n".join(apply),
-        rollback="\n\n".join(rollback),
-        squashed=squashed,
-    )
-    path.write_text(content)
-
-    return Migration(path.stem, path, [])
+            squash.remove(migration, next_migration)
 
 
 @app.command("squash")
-def squash(  # noqa: C901, PLR0912, PLR0915
+def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
     migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
     *,
     backup: bool = typer.Option(False, "--backup/ ", help="Keep original files."),  # noqa: FBT003
     source: bool = typer.Option(False, "--source/ ", help="Add comments for statements source migration."),  # noqa: FBT003
+    prompt_update: bool = typer.Option(False, "--update-prompt/ ", help="Confirm before including UPDATE statements."),  # noqa: FBT003
+    prompt_skip: bool = typer.Option(
+        False,  # noqa: FBT003
+        "--skip-prompt/ ",
+        help="Confirm before skipping unsquashable files, allow removal instead.",
+    ),
     verbose: int = typer.Option(
         0,
         "-v",
@@ -554,10 +527,27 @@ def squash(  # noqa: C901, PLR0912, PLR0915
     squashed = []
     depends = None
     latest = None
-    for migration in migrations:
+    for idx, migration in enumerate(migrations):
         if not migration.is_sql or not migration.use_transaction:
+            if prompt_skip:
+                view = typer.confirm(f"View unsquashable migration {migration.id}", default=True)
+                if view:
+                    content = migration.path.read_text()
+                    logger.error(content)
+
+                remove = typer.confirm(f"Remove unsquashable migration {migration.id}", default=False)
+                if remove:
+                    next_migration = None
+                    with contextlib.suppress(IndexError):
+                        next_migration = migrations[idx + 1]
+
+                    squash.remove(migration, next_migration)
+
+                    latest = migration
+                    continue
+
             if applies or rollbacks:
-                new = _write(applies, rollbacks, latest, depends, squashed)
+                new = squash.write(applies, rollbacks, latest, depends, squashed)
                 replaced[latest.id]["new"] = new
                 if new is None:
                     # New returns None if no update would actually occur (single file squash)
@@ -569,21 +559,23 @@ def squash(  # noqa: C901, PLR0912, PLR0915
             depends = migration.id
             continue
 
+        logger.warning("Squashing %s", migration.id)
         squashed.append(migration.id)
         latest = migration
         replaced[migration.id] = {"orig": migration}
 
-        _, _, _, _, _, apply_statments, rollback_statements = read_sql_migration(migration.path)
-        for apply in apply_statments:
+        _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
+        for i, apply in enumerate(apply_statements):
             parsed = sqlparse.parse(apply)[0]
             if source:
                 apply = f"{apply} -- source: {migration.id}"  # noqa: PLW2901
-            if parsed.get_type() in ("CREATE", "ALTER", "DROP"):
+            type_ = parsed.get_type()
+            if type_ in ("CREATE", "ALTER", "DROP"):
                 for token in parsed.tokens:
                     if isinstance(token, sqlparse.sql.Identifier):
                         applies[token.get_real_name()].append(apply)
                         break
-                else:
+                else:  # pragma: no cover
                     logger.debug(parsed.tokens)
                     logger.error("Can not extract table from DDL statement in migration %s", migration.id)
                     logger.warning(apply)
@@ -591,6 +583,15 @@ def squash(  # noqa: C901, PLR0912, PLR0915
 
             else:
                 logger.debug(parsed.get_type())
+                if type_ == "UPDATE" and prompt_update:
+                    logger.error("")
+                    with contextlib.suppress(IndexError):
+                        logger.error("   %s", apply_statements[i - 1])
+                    logger.error(">> %s", apply)
+                    with contextlib.suppress(IndexError):
+                        logger.error("   %s", apply_statements[i + 1])
+                    logger.error("")
+                    typer.confirm("Include update statement", default=True)
                 applies["__data"].append(apply)
         rollbacks_ = defaultdict(list)
         for rollback in reversed(rollback_statements):
@@ -602,7 +603,7 @@ def squash(  # noqa: C901, PLR0912, PLR0915
                     if isinstance(token, sqlparse.sql.Identifier):
                         rollbacks_[token.get_real_name()].append(rollback)
                         break
-                else:
+                else:  # pragma: no cover
                     logger.debug(parsed.tokens)
                     logger.error("Can not extract table from DDL statement in migration %s", migration.id)
                     logger.warning(rollback)
@@ -616,7 +617,7 @@ def squash(  # noqa: C901, PLR0912, PLR0915
             rollbacks[ident].append(statements)
 
     if applies or rollbacks:
-        new = _write(applies, rollbacks, latest, depends, squashed)
+        new = squash.write(applies, rollbacks, latest, depends, squashed)
         replaced[latest.id]["new"] = new
         if new is None:
             # New returns None if no update would actually occur (single file squash)
@@ -696,8 +697,8 @@ def squash(
             print("break")
             return
         logger.error(migration)
-        _, _, _, _, _, apply_statments, rollback_statements = read_sql_migration(migration.path)
-        for apply in apply_statments:
+        _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
+        for apply in apply_statements:
             print(apply)
             parsed = sqlglot.parse_one(apply, read="postgres", dialect="postgres")
             # print(parsed)
