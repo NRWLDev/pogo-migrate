@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.19 (released 2024-07-17)
+
+### Features and Improvements
+
+- Add experimental squash command. [[#13](https://github.com/NRWLDev/pogo-migrate/issues/13)] [[3ebfb0a](https://github.com/NRWLDev/pogo-migrate/commit/3ebfb0a12f1355aa28d81ca1002140005d5ebd9a)]
+
 ## v0.0.18 (released 2024-05-28)
 
 ### Features and Improvements
