@@ -1406,21 +1406,21 @@ class TestSquash:
             result.output
             == '''\
 View unsquashable migration 20210101_01_abcd-first-migration [Y/n]: y
-
-"""
-first migration
-"""
-__depends__ = []
-__transaction__ = False
-
-async def apply(db):
-    await db.execute("CREATE TABLE two();")
-
-async def rollback(db):
-    await db.execute("DROP TABLE two;")
-
+                                                                                
+"""                                                                             
+first migration                                                                 
+"""                                                                             
+__depends__ = []                                                                
+__transaction__ = False                                                         
+                                                                                
+async def apply(db):                                                            
+    await db.execute("CREATE TABLE two();")                                     
+                                                                                
+async def rollback(db):                                                         
+    await db.execute("DROP TABLE two;")                                         
+                                                                                
 Remove unsquashable migration 20210101_01_abcd-first-migration [y/N]: y
-'''
+'''  # noqa: W293, W291
         )
 
         assert sorted([path.stem for path in migrations.iterdir() if path.suffix in {".py", ".sql"}]) == []

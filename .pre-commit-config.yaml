@@ -3,6 +3,7 @@ repos:
     rev: v4.4.0
     hooks:
       - id: trailing-whitespace
+        exclude: tests/test_cli.py
       - id: check-added-large-files
       - id: check-ast
       - id: check-json
