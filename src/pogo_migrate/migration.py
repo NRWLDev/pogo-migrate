@@ -22,6 +22,15 @@ def strip_comments(statement: str) -> str:
     return "\n".join([line for line in statement.split("\n") if not line.startswith("--")])
 
 
+def terminate_statements(statements: list[str]) -> list[str]:
+    """Clean up last statement, if its missing a `;` it can cause issues in squashes."""
+    if statements and statements[-1][-1] != ";":
+        stmt = statements.pop()
+        statements.append(f"{stmt};")
+
+    return statements
+
+
 def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable, bool]:
     """Read a sql migration.
 
@@ -51,7 +60,7 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable, bool]
             msg = f"{path.name}: No '-- migrate: rollback' found."
             raise exceptions.BadMigrationError(msg) from e
 
-        apply_statements = sqlparse.split(apply_content.strip())
+        apply_statements = terminate_statements(sqlparse.split(apply_content.strip()))
 
         async def apply(db):  # noqa: ANN001, ANN202
             for statement in apply_statements:
@@ -60,7 +69,7 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable, bool]
                 if statement_:
                     await db.execute(statement_)
 
-        rollback_statements = sqlparse.split(rollback_content.strip())
+        rollback_statements = terminate_statements(sqlparse.split(rollback_content.strip()))
 
         async def rollback(db):  # noqa: ANN001, ANN202
             for statement in rollback_statements:
@@ -69,7 +78,7 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable, bool]
                 if statement_:
                     await db.execute(statement_)
 
-        return message, depends, apply, rollback, use_transaction
+        return message, depends, apply, rollback, use_transaction, apply_statements, rollback_statements
 
 
 class Migration:
@@ -120,7 +129,7 @@ class Migration:
     def load(self: t.Self) -> Migration:
         depends_ = []
         if self.is_sql:
-            message, depends, apply, rollback, in_transaction = read_sql_migration(self.path)
+            message, depends, apply, rollback, in_transaction, _, _ = read_sql_migration(self.path)
             self._doc = message
             self._apply = apply
             self._rollback = rollback
