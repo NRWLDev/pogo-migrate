@@ -491,17 +491,20 @@ def _write(
     template = squash_sql_template
     depends = f" {depends}" if depends else ""
     message = f" {latest.__doc__}"
-    squashed = "\n-- squashed: ".join(squashed[:-1])
-    apply = []
     # add comment for which migrations were squashed in
+    squashed = "\n-- squashed: ".join(squashed[:-1])
+
+    apply = []
     for ident, statements_ in apply_statements.items():
         if ident == "__data":
             continue
         apply.append(f"-- Squash {ident} statements.")
         apply.extend(statements_)
+    apply.append("-- Squash data statements.")
     apply.extend(apply_statements.get("__data", []))
 
     rollback = []
+    rollback.append("-- Squash data statements.")
     for data_statements in reversed(rollback_statements.get("__data", [])):
         rollback.extend(reversed(data_statements))
 
