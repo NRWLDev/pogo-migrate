@@ -487,7 +487,7 @@ def _write(
 ) -> Migration | None:
     if squashed[0] == latest.id:
         return None
-    path = Path(f"{latest.path}.bak")
+    path = Path(f"{latest.path}.squash")
     template = squash_sql_template
     depends = f" {depends}" if depends else ""
     message = f" {latest.__doc__}"
@@ -531,6 +531,8 @@ def _write(
 def squash(  # noqa: C901, PLR0912, PLR0915
     migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
     *,
+    backup: bool = typer.Option(False, "--backup/ ", help="Keep original files."),  # noqa: FBT003
+    source: bool = typer.Option(False, "--source/ ", help="Add comments for statements source migration."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -574,6 +576,8 @@ def squash(  # noqa: C901, PLR0912, PLR0915
         _, _, _, _, _, apply_statments, rollback_statements = read_sql_migration(migration.path)
         for apply in apply_statments:
             parsed = sqlparse.parse(apply)[0]
+            if source:
+                apply = f"{apply} -- source: {migration.id}"  # noqa: PLW2901
             if parsed.get_type() in ("CREATE", "ALTER", "DROP"):
                 for token in parsed.tokens:
                     if isinstance(token, sqlparse.sql.Identifier):
@@ -591,6 +595,8 @@ def squash(  # noqa: C901, PLR0912, PLR0915
         rollbacks_ = defaultdict(list)
         for rollback in reversed(rollback_statements):
             parsed = sqlparse.parse(rollback)[0]
+            if source:
+                rollback = f"{rollback} -- source: {migration.id}"  # noqa: PLW2901
             if parsed.get_type() in ("CREATE", "ALTER", "DROP"):
                 for token in parsed.tokens:
                     if isinstance(token, sqlparse.sql.Identifier):
@@ -619,9 +625,31 @@ def squash(  # noqa: C901, PLR0912, PLR0915
 
     for data in replaced.values():
         orig, new = data["orig"], data.get("new")
-        orig.path.unlink()
+        if backup:
+            orig.path.rename(f"{orig.path}.bak")
+        else:
+            orig.path.unlink()
         if new:
             new.path.rename(orig.path)
+
+
+@app.command("clean")
+def clean(
+    migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
+    *,
+    verbose: int = typer.Option(
+        0,
+        "-v",
+        "--verbose",
+        help="Verbose output. Use multiple times to increase level of verbosity.",
+        count=True,
+        max=3,
+    ),
+) -> None:
+    setup_logging(verbose)
+    for path in Path(migrations_location).iterdir():
+        if path.suffix in {".bak"}:
+            path.unlink()
 
 
 """
