@@ -72,7 +72,7 @@ class TestReadSqlMigration:
             -- migrate: rollback
             """),
         )
-        message, depends, _, _, _ = migration.read_sql_migration(mp)
+        message, depends, _, _, _, _, _ = migration.read_sql_migration(mp)
 
     async def test_apply_func_created(self, migration_file_factory):
         mp = migration_file_factory(
@@ -93,8 +93,18 @@ class TestReadSqlMigration:
             -- migrate: rollback
             """),
         )
-        _, _, apply, _, _ = migration.read_sql_migration(mp)
+        _, _, apply, _, _, apply_statements, _ = migration.read_sql_migration(mp)
 
+        assert apply_statements == [
+            "CREATE TABLE table_one();",
+            "CREATE TABLE table_two();",
+            dedent("""\
+            CREATE TABLE public.user (
+                id BIGSERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                CONSTRAINT uc_name UNIQUE (name)
+            );"""),
+        ]
         db = mock.Mock(execute=AsyncMock())
         await apply(db)
         assert db.execute.call_args_list == [
@@ -132,7 +142,18 @@ class TestReadSqlMigration:
             );
             """),
         )
-        _, _, _, rollback, _ = migration.read_sql_migration(mp)
+        _, _, _, rollback, _, _, rollback_statements = migration.read_sql_migration(mp)
+
+        assert rollback_statements == [
+            "DROP TABLE table_two;",
+            "DROP TABLE table_one;",
+            dedent("""\
+            CREATE TABLE public.user (
+                id BIGSERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                CONSTRAINT uc_name UNIQUE (name)
+            );"""),
+        ]
         db = mock.Mock(execute=AsyncMock())
         await rollback(db)
         assert db.execute.call_args_list == [
@@ -173,7 +194,7 @@ class TestReadSqlMigration:
 
             """),
         )
-        _, _, _, _, in_transaction = migration.read_sql_migration(mp)
+        _, _, _, _, in_transaction, _, _ = migration.read_sql_migration(mp)
         assert in_transaction == expected
 
 

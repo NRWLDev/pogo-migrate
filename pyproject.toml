@@ -30,10 +30,11 @@ python = "^3.9"
 typer = "^0"
 rich = "^13.7.1"
 rtoml = "^0.10.0"
-sqlparse = "^0.4.4"
+sqlparse = "^0"
 tabulate = "^0.9.0"
 python-dotenv = "^1.0.0"
 typing_extensions = { version = "^4.7.0", python = "<3.10" }
+sqlglot = {version = "^25.5.1", extras = ["rs"]}
 
 [tool.poetry.group.dev.dependencies]
 # Tests
@@ -132,19 +133,6 @@ convention = "google"
 
 [tool.poetry.scripts]
 pogo = "pogo_migrate.cli:app"
-
-# [tool.poetry.plugins."yoyo.backends"]
-# odbc = "yoyo.backends.contrib.odbc:ODBCBackend"
-# oracle = "yoyo.backends.contrib.oracle:OracleBackend"
-# postgres = "yoyo.backends.core.postgresql:PostgresqlBackend"
-# postgresql = "yoyo.backends.core.postgresql:PostgresqlBackend"
-# psql = "yoyo.backends.core.postgresql:PostgresqlBackend"
-# "postgresql+psycopg" = "yoyo.backends.core.postgresql:PostgresqlPsycopgBackend"
-# mysql = "yoyo.backends.core.mysql:MySQLBackend"
-# "mysql+mysqldb" = "yoyo.backends.core.mysql:MySQLdbBackend"
-# sqlite = "yoyo.backends.core.sqlite3:SQLiteBackend"
-# snowflake = "yoyo.backends.contrib.snowflake:SnowflakeBackend"
-# redshift = "yoyo.backends.contrib.redshift:RedshiftBackend"
 
 [build-system]
 requires = ["poetry-core>=1.0"]
