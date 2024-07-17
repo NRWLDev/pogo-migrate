@@ -1402,7 +1402,26 @@ class TestSquash:
 
         result = cli_runner.invoke(["squash", "--skip-prompt"], input="y\ny\n")
         assert result.exit_code == 0, result.output
-        assert result.output == ""
+        assert (
+            result.output
+            == '''\
+View unsquashable migration 20210101_01_abcd-first-migration [Y/n]: y
+
+"""
+first migration
+"""
+__depends__ = []
+__transaction__ = False
+
+async def apply(db):
+    await db.execute("CREATE TABLE two();")
+
+async def rollback(db):
+    await db.execute("DROP TABLE two;")
+
+Remove unsquashable migration 20210101_01_abcd-first-migration [y/N]: y
+'''
+        )
 
         assert sorted([path.stem for path in migrations.iterdir() if path.suffix in {".py", ".sql"}]) == []
 
