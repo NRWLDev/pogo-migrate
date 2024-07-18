@@ -13,7 +13,7 @@ def test_version(cli_runner):
     result = cli_runner.invoke(["--version"])
     assert result.exit_code == 0
 
-    assert result.output.strip() == f"pogo-migrate {version}"
+    cli_runner.assert_output(f"pogo-migrate {version}")
 
 
 @pytest.fixture()

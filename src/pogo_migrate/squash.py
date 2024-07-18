@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
+
+import sqlparse
 
 from pogo_migrate.migration import Migration
 
@@ -94,3 +97,60 @@ def write(
     path.write_text(content)
 
     return Migration(path.stem, path, [])
+
+
+@dataclass
+class ParsedStatement:
+    statement: str
+    statement_type: str
+    identifier: str | None
+
+
+def parse(statement: str) -> ParsedStatement:
+    parsed = sqlparse.parse(statement)[0]
+
+    type_ = parsed.get_type()
+
+    identifier = None
+    if type_ in ("CREATE", "ALTER", "DROP"):
+        idx, action = parsed.token_next_by(
+            m=[
+                (sqlparse.tokens.Keyword, "TABLE"),
+                (sqlparse.tokens.Keyword, "AGGREGATE"),
+                (sqlparse.tokens.Keyword, "INDEX"),
+                (None, "EXTENSION"),
+            ],
+        )
+
+        exists_idx, _token = parsed.token_next_by(idx=idx, m=(sqlparse.tokens.Keyword, "EXISTS"))
+        if action.value.startswith("EXTENSION "):
+            # Extension is not picked up as a specific type, so it can include the extension name.
+            identifier = action.value.split()[1]
+        elif action.value == "INDEX":
+            """
+            Fetch tbl_ident from CREATE INDEX statements.
+            Fetch ident from DROP INDEX statements.
+
+            CREATE [UNIQUE] INDEX [IF NOT EXISTS] ident ON tbl_ident;
+            CREATE [UNIQUE] INDEX CONCURRENTLY [IF NOT EXISTS] ident ON tbl_ident;
+            DROP INDEX CONCURRENTLY [IF EXISTS] ident;
+            """
+            on_idx, _on_keyword = parsed.token_next_by(idx=exists_idx or idx, m=(sqlparse.tokens.Keyword, "ON"))
+            idx, ident_token = parsed.token_next(on_idx or exists_idx or idx, skip_ws=True, skip_cm=True)
+            identifier = (
+                ident_token.get_real_name()
+                if isinstance(ident_token, (sqlparse.sql.Identifier, sqlparse.sql.Function))
+                else None
+            )
+        else:
+            # TABLE, AGGREGATE, IF [NOT] EXISTS EXTENSION.
+            idx, ident_token = parsed.token_next(exists_idx or idx, skip_ws=True, skip_cm=True)
+            identifier = (
+                ident_token.get_real_name()
+                if isinstance(ident_token, (sqlparse.sql.Identifier, sqlparse.sql.Function))
+                else None
+            )
+
+    logger.debug(parsed.tokens)
+
+    return ParsedStatement(statement, type_, identifier)

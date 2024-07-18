@@ -18,7 +18,6 @@ from textwrap import dedent
 import click
 import dotenv
 import rtoml
-import sqlparse
 import tabulate
 import typer
 from rich.logging import RichHandler
@@ -588,25 +587,21 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
 
         _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
         for i, apply in enumerate(apply_statements):
-            parsed = sqlparse.parse(apply)[0]
+            parsed = squash.parse(apply)
             if source:
-                apply = f"{apply} -- source: {migration.id}"  # noqa: PLW2901
-            type_ = parsed.get_type()
-            if type_ in ("CREATE", "ALTER", "DROP"):
-                for token in parsed.tokens:
-                    if isinstance(token, sqlparse.sql.Identifier):
-                        applies[token.get_real_name()].append(apply)
-                        break
+                parsed.statement = f"{parsed.statement} -- source: {migration.id}"
+
+            if parsed.statement_type in ("CREATE", "ALTER", "DROP"):
+                if parsed.identifier:
+                    applies[parsed.identifier].append(parsed.statement)
                 else:
-                    logger.debug(parsed.tokens)
                     logger.error("Can not extract table from DDL statement in migration %s", migration.id)
                     logger.warning(apply)
                     raise typer.Exit(code=1)
 
             else:
-                logger.debug(parsed.get_type())
                 keep = True
-                if type_ == "UPDATE" and prompt_update:
+                if parsed.statement_type == "UPDATE" and prompt_update:
                     logger.error("")
                     with contextlib.suppress(IndexError):
                         logger.error("   %s", apply_statements[i - 1])
@@ -615,28 +610,26 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                         logger.error("   %s", apply_statements[i + 1])
                     logger.error("")
                     keep = typer.confirm("Include update statement", default=True)
+
                 if keep:
-                    applies["__data"].append(apply)
+                    applies["__data"].append(parsed.statement)
 
         rollbacks_ = defaultdict(list)
         for rollback in reversed(rollback_statements):
-            parsed = sqlparse.parse(rollback)[0]
+            parsed = squash.parse(rollback)
             if source:
-                rollback = f"{rollback} -- source: {migration.id}"  # noqa: PLW2901
-            if parsed.get_type() in ("CREATE", "ALTER", "DROP"):
-                for token in parsed.tokens:
-                    if isinstance(token, sqlparse.sql.Identifier):
-                        rollbacks_[token.get_real_name()].append(rollback)
-                        break
+                parsed.statement = f"{parsed.statement} -- source: {migration.id}"
+
+            if parsed.statement_type in ("CREATE", "ALTER", "DROP"):
+                if parsed.identifier:
+                    rollbacks_[parsed.identifier].append(parsed.statement)
                 else:
-                    logger.debug(parsed.tokens)
                     logger.error("Can not extract table from DDL statement in migration %s", migration.id)
                     logger.warning(rollback)
                     raise typer.Exit(code=1)
-
             else:
-                logger.debug(parsed.get_type())
-                rollbacks_["__data"].append(rollback)
+                logger.debug(parsed.statement_type)
+                rollbacks_["__data"].append(parsed.statement)
 
         for ident, statements in rollbacks_.items():
             rollbacks[ident].append(statements)
