@@ -597,7 +597,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                     if isinstance(token, sqlparse.sql.Identifier):
                         applies[token.get_real_name()].append(apply)
                         break
-                else:  # pragma: no cover
+                else:
                     logger.debug(parsed.tokens)
                     logger.error("Can not extract table from DDL statement in migration %s", migration.id)
                     logger.warning(apply)
@@ -628,7 +628,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                     if isinstance(token, sqlparse.sql.Identifier):
                         rollbacks_[token.get_real_name()].append(rollback)
                         break
-                else:  # pragma: no cover
+                else:
                     logger.debug(parsed.tokens)
                     logger.error("Can not extract table from DDL statement in migration %s", migration.id)
                     logger.warning(rollback)
