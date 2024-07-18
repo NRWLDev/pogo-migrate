@@ -323,6 +323,8 @@ def new(
         max=3,
     ),
 ) -> None:
+    """Generate a new migration."""
+
     @handle_exceptions(verbose)
     async def new_() -> None:
         if dotenv:  # pragma: no cover
@@ -368,6 +370,11 @@ def history(
         max=3,
     ),
 ) -> None:
+    """List migration history.
+
+    If database location is configured, also check applied status of each migration.
+    """
+
     @handle_exceptions(verbose)
     async def history_() -> None:
         if dotenv:  # pragma: no cover
@@ -418,6 +425,8 @@ def apply(
         max=3,
     ),
 ) -> None:
+    """Apply migrations."""
+
     @handle_exceptions(verbose)
     async def apply_() -> None:
         if dotenv:  # pragma: no cover
@@ -452,6 +461,8 @@ def rollback(
         max=3,
     ),
 ) -> None:
+    """Rollback one or more migrations."""
+
     @handle_exceptions(verbose)
     async def rollback_() -> None:
         if dotenv:  # pragma: no cover
@@ -480,6 +491,7 @@ def remove(
         max=3,
     ),
 ) -> None:
+    """Remove a migration from the dependency chain."""
     setup_logging(verbose)
     migrations = [
         Migration(path.stem, path, []) for path in Path(migrations_location).iterdir() if path.suffix in {".py", ".sql"}
@@ -515,7 +527,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         max=3,
     ),
 ) -> None:
-    """[EXPERIMENTAL] Squash migrations.
+    """Squash migrations. [EXPERIMENTAL]
 
     Python migrations and non transaction based transactions are skipped by default.
 
@@ -660,6 +672,7 @@ def clean(
         max=3,
     ),
 ) -> None:
+    """Clean the migration directory of .bak migrations from squash."""
     setup_logging(verbose)
     for path in Path(migrations_location).iterdir():
         if path.suffix in {".bak"}:
@@ -754,6 +767,8 @@ def mark(
         max=3,
     ),
 ) -> None:
+    """Mark a migration as applied, without running."""
+
     @handle_exceptions(verbose)
     async def _mark() -> None:
         if dotenv:  # pragma: no cover
@@ -792,6 +807,8 @@ def unmark(
         max=3,
     ),
 ) -> None:
+    """Mark a migration as unapplied, without rolling back."""
+
     @handle_exceptions(verbose)
     async def _unmark() -> None:
         if dotenv:  # pragma: no cover
