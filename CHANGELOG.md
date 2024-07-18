@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.0.20 (released 2024-07-18)
+
+### Bug fixes
+
+- Remove sqlglot as a dependency until it can support all use cases. [[5b706a5](https://github.com/NRWLDev/pogo-migrate/commit/5b706a5c76f281b19235a84344560a393bc028b5)]
+- Add additional cli output tests. [[363d8e5](https://github.com/NRWLDev/pogo-migrate/commit/363d8e58a5d7fd386119420cf7abfbecf0beccd8)]
+
 ## v0.0.19 (released 2024-07-17)
 
 ### Features and Improvements
