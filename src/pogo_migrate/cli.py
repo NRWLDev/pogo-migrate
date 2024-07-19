@@ -672,17 +672,9 @@ def clean(
             path.unlink()
 
 
-"""
-Issue with gen_random_uuid() parsing in sqlglot.
-https://github.com/tobymao/sqlglot/issues/3774
-
-import sqlglot
-from sqlglot import expressions as exp
-
-@app.command("squash-glot")
-def squash(
+@app.command("validate")
+def validate(
     migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
-    # database: str = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
     verbose: int = typer.Option(
         0,
@@ -693,56 +685,40 @@ def squash(
         max=3,
     ),
 ) -> None:
-    # @handle_exceptions(verbose)
-    # async def sqaush_() -> None:
-    #     if dotenv:  # pragma: no cover
-    #         load_dotenv()
-    #     config = load_config()
-    #
-    #     connection_string = database or config.database_dsn
-    #     db = await sql.get_connection(connection_string)
-    #
-    #     await migrate.apply(config, db)
+    """Validate migrations.
 
+    Best effort pass through to make sure identifiers aren't keywords.
+    """
     setup_logging(verbose)
     migrations = [
         Migration(path.stem, path, []) for path in Path(migrations_location).iterdir() if path.suffix in {".py", ".sql"}
     ]
     migrations = topological_sort([m.load() for m in migrations])
-    statements = defaultdict(list)
+
     for migration in migrations:
-        logger.error(migration.is_sql)
         if not migration.is_sql:
-            print("break")
-            return
-        logger.error(migration)
+            from unittest import mock
+
+            mock_asyncpg = mock.Mock()
+            mock_asyncpg.execute = mock.AsyncMock(return_value=None)
+            mock_asyncpg.fetch = mock.AsyncMock(return_value=[])
+            mock_asyncpg.fetchrow = mock.AsyncMock(return_value=mock.MagicMock())
+            try:
+                asyncio.run(migration.apply(mock_asyncpg))
+            except Exception:  # noqa: BLE001
+                logger.warning("Can't validate python migration %s, skipping...", migration.id)
+            continue
+
         _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
-        for apply in apply_statements:
-            print(apply)
-            parsed = sqlglot.parse_one(apply, read="postgres", dialect="postgres")
-            # print(parsed)
-            # print(parsed.tokens)
-            print(parsed)
-            if isinstance(parsed, (exp.Create, exp.AlterTable, exp.Drop)):
-                for table in parsed.find_all(exp.Table):
-                    statements["__data"].append(apply)
-                    break
-                else:
-                    print("no identifier")
-            else:
-                statements["__data"].append(apply)
-    with Path("tmp").open("w") as f:
-        for ident, statements_ in statements.items():
-            if ident == "__data":
-                continue
-            print(ident, statements_)
-            for statement in statements_:
-                f.write(f"{statement}\n\n")
-        for statement in statements["__data"]:
-            f.write(f"{statement}\n\n")
-        # print(rollback_statements)
-    # asyncio.run(squash())
-"""
+        for statement in apply_statements + rollback_statements:
+            parsed = squash.parse(statement)
+
+            if parsed.statement_type in ("CREATE", "ALTER", "DROP") and parsed.identifier is None:
+                logger.error(
+                    "Can not extract table from DDL statement in migration %s, check that table name is not a reserved word.",
+                    migration.id,
+                )
+                logger.warning(statement)
 
 
 @app.command("mark")

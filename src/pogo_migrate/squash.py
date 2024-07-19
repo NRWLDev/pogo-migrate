@@ -106,6 +106,22 @@ class ParsedStatement:
     identifier: str | None
 
 
+"""
+            parsed = sqlglot.parse_one(apply, read="postgres", dialect="postgres")
+            # print(parsed)
+            # print(parsed.tokens)
+            print(parsed)
+            if isinstance(parsed, (exp.Create, exp.AlterTable, exp.Drop)):
+                for table in parsed.find_all(exp.Table):
+                    statements["__data"].append(apply)
+                    break
+                else:
+                    print("no identifier")
+            else:
+                statements["__data"].append(apply)
+"""
+
+
 def parse(statement: str) -> ParsedStatement:
     parsed = sqlparse.parse(statement)[0]
 
