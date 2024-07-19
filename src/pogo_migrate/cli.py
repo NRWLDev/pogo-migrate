@@ -701,7 +701,7 @@ def validate(
 
             mock_asyncpg = mock.Mock()
             mock_asyncpg.execute = mock.AsyncMock(return_value=None)
-            mock_asyncpg.fetch = mock.AsyncMock(return_value=[])
+            mock_asyncpg.fetch = mock.AsyncMock(return_value=[mock.MagicMock()])
             mock_asyncpg.fetchrow = mock.AsyncMock(return_value=mock.MagicMock())
             try:
                 asyncio.run(migration.apply(mock_asyncpg))
