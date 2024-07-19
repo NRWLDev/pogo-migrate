@@ -1021,6 +1021,21 @@ files = [
 ]
 
 [[package]]
+name = "sqlglot"
+version = "25.6.1"
+description = "An easily customizable SQL parser and transpiler"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "sqlglot-25.6.1-py3-none-any.whl", hash = "sha256:c1fcbaa00429979f16fb8cea20279a8b3f5312e76d97abb8f8c6a9b21be450d7"},
+    {file = "sqlglot-25.6.1.tar.gz", hash = "sha256:ea40f3bf8452e2c1a696fe120163190bd67e49b346336e7db6d34400b57b7601"},
+]
+
+[package.extras]
+dev = ["duckdb (>=0.6)", "maturin (>=1.4,<2.0)", "mypy", "pandas", "pandas-stubs", "pdoc", "pre-commit", "python-dateutil", "ruff (==0.4.3)", "types-python-dateutil", "typing-extensions"]
+rs = ["sqlglotrs (==0.2.8)"]
+
+[[package]]
 name = "sqlparse"
 version = "0.4.4"
 description = "A non-validating SQL parser."
@@ -1134,4 +1149,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "22b881cc3d770504e47d3ff61b3dd0f7fc5198f39d593e4292598e4c6acd2276"
+content-hash = "4cbe849bb9f6d1c81bc9dc7d98f97b4e501677499a5e29aac7845f6bb989d0d3"

@@ -508,6 +508,7 @@ def remove(
 @app.command("squash")
 def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
     migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
+    backend: str = typer.Option("sqlparse", "-b", "--backend"),
     *,
     backup: bool = typer.Option(False, "--backup/ ", help="Keep .bak copy of original files."),  # noqa: FBT003
     source: bool = typer.Option(False, "--source/ ", help="Add comment for source migration to each statement."),  # noqa: FBT003
@@ -587,7 +588,13 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
 
         _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
         for i, apply in enumerate(apply_statements):
-            parsed = squash.parse(apply)
+            try:
+                parsed = squash.parse(apply) if backend == "sqlparse" else squash.parse_sqlglot(apply)
+            except squash.ParseError as e:
+                logger.error("%s: %s", migration.id, str(e))
+                logger.warning(apply)
+                raise typer.Exit(code=1) from e
+
             if source:
                 parsed.statement = f"{parsed.statement} -- source: {migration.id}"
 
@@ -616,7 +623,12 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
 
         rollbacks_ = defaultdict(list)
         for rollback in reversed(rollback_statements):
-            parsed = squash.parse(rollback)
+            try:
+                parsed = squash.parse(rollback) if backend == "sqlparse" else squash.parse_sqlglot(rollback)
+            except squash.ParseError as e:
+                logger.error("%s: %s", migration.id, str(e))
+                logger.warning(rollback)
+                raise typer.Exit(code=1) from e
             if source:
                 parsed.statement = f"{parsed.statement} -- source: {migration.id}"
 
@@ -670,79 +682,6 @@ def clean(
     for path in Path(migrations_location).iterdir():
         if path.suffix in {".bak"}:
             path.unlink()
-
-
-"""
-Issue with gen_random_uuid() parsing in sqlglot.
-https://github.com/tobymao/sqlglot/issues/3774
-
-import sqlglot
-from sqlglot import expressions as exp
-
-@app.command("squash-glot")
-def squash(
-    migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
-    # database: str = typer.Option(None, "-d", "--database", help="Database connection string."),
-    *,
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
-) -> None:
-    # @handle_exceptions(verbose)
-    # async def sqaush_() -> None:
-    #     if dotenv:  # pragma: no cover
-    #         load_dotenv()
-    #     config = load_config()
-    #
-    #     connection_string = database or config.database_dsn
-    #     db = await sql.get_connection(connection_string)
-    #
-    #     await migrate.apply(config, db)
-
-    setup_logging(verbose)
-    migrations = [
-        Migration(path.stem, path, []) for path in Path(migrations_location).iterdir() if path.suffix in {".py", ".sql"}
-    ]
-    migrations = topological_sort([m.load() for m in migrations])
-    statements = defaultdict(list)
-    for migration in migrations:
-        logger.error(migration.is_sql)
-        if not migration.is_sql:
-            print("break")
-            return
-        logger.error(migration)
-        _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
-        for apply in apply_statements:
-            print(apply)
-            parsed = sqlglot.parse_one(apply, read="postgres", dialect="postgres")
-            # print(parsed)
-            # print(parsed.tokens)
-            print(parsed)
-            if isinstance(parsed, (exp.Create, exp.AlterTable, exp.Drop)):
-                for table in parsed.find_all(exp.Table):
-                    statements["__data"].append(apply)
-                    break
-                else:
-                    print("no identifier")
-            else:
-                statements["__data"].append(apply)
-    with Path("tmp").open("w") as f:
-        for ident, statements_ in statements.items():
-            if ident == "__data":
-                continue
-            print(ident, statements_)
-            for statement in statements_:
-                f.write(f"{statement}\n\n")
-        for statement in statements["__data"]:
-            f.write(f"{statement}\n\n")
-        # print(rollback_statements)
-    # asyncio.run(squash())
-"""
 
 
 @app.command("mark")

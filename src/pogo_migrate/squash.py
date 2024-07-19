@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 
+import sqlglot
 import sqlparse
+from sqlglot import expressions as exp
 
 from pogo_migrate.migration import Migration
 
@@ -154,3 +157,27 @@ def parse(statement: str) -> ParsedStatement:
     logger.debug(parsed.tokens)
 
     return ParsedStatement(statement, type_, identifier)
+
+
+class ParseError(Exception): ...
+
+
+def parse_sqlglot(statement: str) -> ParsedStatement:
+    try:
+        parsed = sqlglot.parse_one(statement, read="postgres", dialect="postgres")
+    except sqlglot.errors.ParseError as e:
+        r = r"(?P<msg>Expected table name but got) <.*text: (?P<text>\w+), .*>\. Line (?P<line>\d+), Col: (?P<column>\d+)\.\s(?P<statement>.*)"
+        m = re.match(r, str(e))
+        msg = "{msg} {text}. Line: {line}, Column: {column}".format(**m.groupdict())
+        raise ParseError(msg) from e
+
+    # print(parsed)
+    # print(parsed.tokens)
+    identifier = None
+    # print(parsed)
+    if isinstance(parsed, (exp.Create, exp.AlterTable, exp.Drop)):
+        for table in parsed.find_all(exp.Table):
+            identifier = table.name
+            break
+
+    return ParsedStatement(statement, parsed.__class__.__name__.upper(), identifier)

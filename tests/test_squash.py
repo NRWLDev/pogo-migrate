@@ -481,15 +481,15 @@ def test_rollback_data_statements_first_reversed_from_discovery_order(migration_
     ("statement", "expected_type"),
     [
         ("CREATE TABLE tbl (id INT);", "CREATE"),
-        ("ALTER TABLE tbl ADD COLUMN id INT;", "ALTER"),
+        ("ALTER TABLE tbl ADD COLUMN id INT;", "ALTERTABLE"),
         ("DROP TABLE tbl;", "DROP"),
-        ("UPDATE TABLE tbl SET id = 1;", "UPDATE"),
+        ("UPDATE tbl SET id = 1;", "UPDATE"),
         ("INSERT INTO TABLE tbl (id) VALUES (1);", "INSERT"),
         ("DELETE FROM TABLE tbl WHERE id = 1", "DELETE"),
     ],
 )
-def test_parse_type(statement, expected_type):
-    parsed = squash.parse(statement)
+def test_parse_sqlglot_type(statement, expected_type):
+    parsed = squash.parse_sqlglot(statement)
 
     assert parsed.statement_type == expected_type
 
@@ -520,27 +520,26 @@ def test_parse_type(statement, expected_type):
         ("DROP EXTENSION pgcrypto;", "pgcrypto"),
         ("DROP INDEX ix_table_id;", "ix_table_id"),
         ("DROP INDEX IF EXISTS ix_table_id;", "ix_table_id"),
-        ("UPDATE TABLE tbl SET id = 1;", None),
+        ("UPDATE tbl SET id = 1;", None),
         ("INSERT INTO TABLE tbl (id) VALUES (1);", None),
         ("DELETE FROM TABLE tbl WHERE id = 1", None),
     ],
 )
-def test_parse_identifier(statement, expected_identifier):
-    parsed = squash.parse(statement)
+def test_parse_sqlglot_identifier(statement, expected_identifier):
+    parsed = squash.parse_sqlglot(statement)
 
     assert parsed.identifier == expected_identifier
 
 
 @pytest.mark.parametrize(
-    ("statement", "expected_identifier"),
+    ("statement"),
     [
-        ("CREATE TABLE lock (id INT);", None),
-        ("ALTER TABLE lock ADD COLUMN id INT;", None),
-        ("DROP TABLE lock;", None),
+        ("CREATE TABLE lock (id INT);"),
+        ("ALTER TABLE lock ADD COLUMN id INT;"),
+        ("DROP TABLE lock;"),
     ],
 )
-def test_parse_identifier_aborts_at_table_keyword(statement, expected_identifier):
+def test_parse_sqlglot_identifier_aborts_at_table_keyword(statement):
     # Original code would pick up column identifier.
-    parsed = squash.parse(statement)
-
-    assert parsed.identifier == expected_identifier
+    with pytest.raises(squash.ParseError, match="Expected table name but got lock."):
+        squash.parse_sqlglot(statement)
