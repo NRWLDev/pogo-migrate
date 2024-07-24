@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.0.21 (released 2024-07-24)
+
+### Features and Improvements
+
+- Rework statement parsing for `pogo squash` [[#15](https://github.com/NRWLDev/pogo-migrate/issues/15)] [[3229404](https://github.com/NRWLDev/pogo-migrate/commit/3229404449dfd9f83dcca82ee1ebb29eabfcaf52)]
+
+### Bug fixes
+
+- Relax rtoml dependency constraint [[b7ac4f6](https://github.com/NRWLDev/pogo-migrate/commit/b7ac4f64d4f1b201b74acc38cdc99503ca0d734f)]
+
 ## v0.0.20 (released 2024-07-18)
 
 ### Bug fixes
