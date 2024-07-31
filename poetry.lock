@@ -1022,13 +1022,13 @@ files = [
 
 [[package]]
 name = "sqlglot"
-version = "25.6.1"
+version = "25.8.1"
 description = "An easily customizable SQL parser and transpiler"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "sqlglot-25.6.1-py3-none-any.whl", hash = "sha256:c1fcbaa00429979f16fb8cea20279a8b3f5312e76d97abb8f8c6a9b21be450d7"},
-    {file = "sqlglot-25.6.1.tar.gz", hash = "sha256:ea40f3bf8452e2c1a696fe120163190bd67e49b346336e7db6d34400b57b7601"},
+    {file = "sqlglot-25.8.1-py3-none-any.whl", hash = "sha256:9e79b211ecc15b23440be3fc82f292615ee2c49d85571ca861cc0398120d7baf"},
+    {file = "sqlglot-25.8.1.tar.gz", hash = "sha256:afc4df057ab11be23278655ec8c31b21118077d0c68c001a9764767b72799a99"},
 ]
 
 [package.extras]
@@ -1149,4 +1149,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "4cbe849bb9f6d1c81bc9dc7d98f97b4e501677499a5e29aac7845f6bb989d0d3"
+content-hash = "484121d061af6a7dd79c184aa9c8d4e75b86ac90c05a921bb598c086461cf551"

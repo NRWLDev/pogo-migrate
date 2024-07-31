@@ -171,16 +171,14 @@ def parse_sqlglot(statement: str) -> ParsedStatement:
         msg = "{msg} {text}. Line: {line}, Column: {column}".format(**m.groupdict())
         raise ParseError(msg) from e
 
-    # print(parsed)
-    # print(parsed.tokens)
     identifier = None
-    # print(parsed)
     if isinstance(parsed, (exp.Create, exp.AlterTable, exp.Drop)):
         for table in parsed.find_all(exp.Table):
             identifier = table.name
             break
     elif isinstance(parsed, exp.Command):
         # Unhandled syntax by sqlglot, fallback to sqlparse
+        logger.warning("sqlglot failed to parse, falling back to sqlparse.")
         return parse(statement)
 
     return ParsedStatement(statement, parsed.__class__.__name__.upper(), identifier)
