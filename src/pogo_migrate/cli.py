@@ -481,6 +481,7 @@ def remove(
     migration_id: str = typer.Argument(show_default=False, help="Migration id to remove (message can be excluded)."),
     migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
     *,
+    backup: bool = typer.Option(False, "--backup/ ", help="Keep .bak copy of original files."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -502,7 +503,7 @@ def remove(
             with contextlib.suppress(IndexError):
                 next_migration = migrations[i + 1]
 
-            squash.remove(migration, next_migration)
+            squash.remove(migration, next_migration, backup=backup)
 
 
 @app.command("squash")
@@ -562,7 +563,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                     with contextlib.suppress(IndexError):
                         next_migration = migrations[idx + 1]
 
-                    squash.remove(migration, next_migration)
+                    squash.remove(migration, next_migration, backup=backup)
 
                     latest = migration
                     continue

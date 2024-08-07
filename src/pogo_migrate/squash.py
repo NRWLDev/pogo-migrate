@@ -30,7 +30,7 @@ squash_sql_template = dedent(
 )
 
 
-def remove(current: Migration, dependent: Migration | None) -> None:
+def remove(current: Migration, dependent: Migration | None, *, backup: bool = False) -> None:
     logger.warning("Removing %s", current.id)
     new_depends = ", ".join(current.depends_ids)
     if dependent:
@@ -41,7 +41,10 @@ def remove(current: Migration, dependent: Migration | None) -> None:
             .replace('__depends__ = [""]', "__depends__ = []"),
         )
         dependent.load()
-    current.path.unlink()
+    if backup:
+        current.path.rename(f"{current.path}.bak")
+    else:
+        current.path.unlink()
 
 
 def write(
