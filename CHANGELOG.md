@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.0.22 (released 2024-08-07)
+
+### Features and Improvements
+
+- Add support for backup flag when removing migrations. [[#21](https://github.com/NRWLDev/pogo-migrate/issues/21)] [[f4f8ba8](https://github.com/NRWLDev/pogo-migrate/commit/f4f8ba8baa756f3e2dc6f51becada138afb24881)]
+
 ## v0.0.21 (released 2024-07-24)
 
 ### Features and Improvements
