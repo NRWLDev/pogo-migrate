@@ -1,3 +1,4 @@
+from pathlib import Path
 from textwrap import dedent
 
 import pytest
@@ -24,6 +25,28 @@ def test_remove_no_dependent(migration_file_factory):
     squash.remove(m, None)
 
     assert mp.exists() is False
+
+
+def test_remove_with_backup(migration_file_factory):
+    mp = migration_file_factory(
+        "20210101_01_rando-commit",
+        "sql",
+        dedent("""
+        -- commit
+        -- depends:
+
+        -- migrate: apply
+        -- migrate: rollback
+        """),
+    )
+
+    m = migration.Migration(mp.stem, mp, None)
+    m.load()
+
+    squash.remove(m, None, backup=True)
+
+    assert mp.exists() is False
+    assert Path(f"{mp}.bak").exists() is True
 
 
 def test_remove_no_parent_with_dependent(migration_file_factory):

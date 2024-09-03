@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pogo-migrate"
-version = "0.0.20"
+version = "0.0.22"
 description = "Database migration tool for asyncpg"
 readme = "README.md"
 homepage = "https://github.com/NRWLDev/pogo-migrate"
@@ -28,7 +28,7 @@ python = "^3.9"
 
 typer = "^0"
 rich = "^13.7.1"
-rtoml = "^0.10.0"
+rtoml = ">=0.10"
 sqlparse = "^0"
 tabulate = "^0.9.0"
 python-dotenv = "^1.0.0"
@@ -48,30 +48,40 @@ ruff = "^0.3.0"
 pre-commit = "^3.0.2"
 
 # Release management
-changelog-gen = {version = "^0.9", extras = ["bump-my-version"]}
+changelog-gen = "^0.12"
 pytest-asyncio = "^0.23.5"
 nest-asyncio = "^1.6.0"
 
-[tool.bumpversion]
-current_version = "0.0.20"
-commit = true
-tag = true
-
-[[tool.bumpversion.files]]
-filename = "pyproject.toml"
-search = 'version = "{current_version}"'
-replace = 'version = "{new_version}"'
-
 [tool.changelog_gen]
-release = true
-commit = true
+current_version = "0.0.22"
 reject_empty = true
 allowed_branches = [
     "main",
 ]
 date_format = "(released %Y-%m-%d)"
-issue_link = "https://github.com/NRWLDev/pogo-migrate/issues/::issue_ref::"
-commit_link = "https://github.com/NRWLDev/pogo-migrate/commit/::commit_hash::"
+
+[tool.changelog_gen.github]
+strip_pr_from_description = true
+extract_pr_from_description = true
+extract_common_footers = true
+
+[[tool.changelog_gen.extractors]]
+footer = ["closes", "fixes", "Refs"]
+pattern = '#(?P<issue_ref>\d+)'
+
+[[tool.changelog_gen.link_generators]]
+source = "issue_ref"
+link = "https://github.com/NRWLDev/pogo-migrate/issues/{0}"
+
+[[tool.changelog_gen.link_generators]]
+source = "__change__"
+text = "{0.short_hash}"
+link = "https://github.com/NRWLDev/pogo-migrate/commit/{0.commit_hash}"
+
+[[tool.changelog_gen.files]]
+filename = "pyproject.toml"
+pattern = 'version = "{version}"'
+
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
