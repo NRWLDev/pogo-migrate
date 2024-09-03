@@ -174,7 +174,7 @@ def parse_sqlglot(statement: str) -> ParsedStatement:
         raise ParseError(msg) from e
 
     identifier = None
-    if isinstance(parsed, (exp.Create, exp.AlterTable, exp.Drop)):
+    if isinstance(parsed, (exp.Create, exp.Alter, exp.Drop)):
         for table in parsed.find_all(exp.Table):
             identifier = table.name
             break
