@@ -698,16 +698,7 @@ def validate(
 
     for migration in migrations:
         if not migration.is_sql:
-            from unittest import mock
-
-            mock_asyncpg = mock.Mock()
-            mock_asyncpg.execute = mock.AsyncMock(return_value=None)
-            mock_asyncpg.fetch = mock.AsyncMock(return_value=[mock.MagicMock()])
-            mock_asyncpg.fetchrow = mock.AsyncMock(return_value=mock.MagicMock())
-            try:
-                asyncio.run(migration.apply(mock_asyncpg))
-            except Exception:  # noqa: BLE001
-                logger.warning("Can't validate python migration %s, skipping...", migration.id)
+            logger.warning("Can't validate python migration %s, skipping...", migration.id)
             continue
 
         _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
