@@ -168,7 +168,9 @@ def parse_sqlglot(statement: str) -> ParsedStatement:
     except sqlglot.errors.ParseError as e:
         r = r"(?P<msg>Expected table name but got) <.*text: (?P<text>\w+), .*>\. Line (?P<line>\d+), Col: (?P<column>\d+)\.\s(?P<statement>.*)"
         m = re.match(r, str(e))
-        msg = "{msg} {text}. Line: {line}, Column: {column}".format(**m.groupdict())
+        msg = str(e)
+        if m:
+            msg = "{msg} {text}. Line: {line}, Column: {column}".format(**m.groupdict())
         raise ParseError(msg) from e
 
     identifier = None

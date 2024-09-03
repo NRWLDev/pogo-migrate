@@ -520,6 +520,8 @@ def test_parse_sqlglot_type(statement, expected_type):
         ("DROP EXTENSION pgcrypto;", "pgcrypto"),
         ("DROP INDEX ix_table_id;", "ix_table_id"),
         ("DROP INDEX IF EXISTS ix_table_id;", "ix_table_id"),
+        ("DROP INDEX CONCURRENTLY ix_table_id;", "tbl"),
+        ("DROP INDEX CONCURRENTLY IF EXISTS ix_table_id;", "tbl"),
         ("UPDATE tbl SET id = 1;", None),
         ("INSERT INTO TABLE tbl (id) VALUES (1);", None),
         ("DELETE FROM TABLE tbl WHERE id = 1", None),
