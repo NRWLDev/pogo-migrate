@@ -1,4 +1,5 @@
 import importlib.metadata
+from pathlib import Path
 from textwrap import dedent
 from unittest import mock
 
@@ -1061,6 +1062,36 @@ class TestRemove:
         assert result.exit_code == 0, result.output
 
         assert mp.exists() is False
+
+    def test_migration_removed_from_chain_with_backup(self, migration_file_factory, cli_runner):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_02_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        mp = migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+
+        result = cli_runner.invoke(["remove", "20210101_02_rando", "--backup"])
+        assert result.exit_code == 0, result.output
+
+        assert mp.exists() is False
+        assert Path(f"{mp}.bak").exists() is True
 
 
 class TestClean:
