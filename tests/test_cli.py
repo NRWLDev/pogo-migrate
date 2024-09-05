@@ -831,7 +831,7 @@ class TestValidate:
     @pytest.mark.usefixtures("migrations", "pyproject")
     def test_validate_checks_py(self, cli_runner, migration_file_factory):
         migration_file_factory(
-            "20210101_01_abcde-first-migration",
+            "20210101_01_rando-commit",
             "py",
             dedent('''
             """
@@ -853,11 +853,11 @@ class TestValidate:
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
-            Can not extract table from DDL statement in migration
-            20210101_01_abcde-first-migration, check that table name is not a reserved word.
+            Can not extract table from DDL statement in migration 20210101_01_rando-commit,
+            check that table name is not a reserved word.
             DROP INDEX;
-            Can not extract table from DDL statement in migration
-            20210101_01_abcde-first-migration, check that table name is not a reserved word.
+            Can not extract table from DDL statement in migration 20210101_01_rando-commit,
+            check that table name is not a reserved word.
             DROP TABLE;
             """),
         )
