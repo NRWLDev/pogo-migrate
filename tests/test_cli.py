@@ -1232,7 +1232,7 @@ class TestSquash:
         assert result.exit_code == 1, result.output
 
         cli_runner.assert_output(
-            "Can not extract table from DDL statement in migration \n20210101_01_abcd-first-migration",
+            "20210101_01_abcd-first-migration: Expected table name but got lock. Line: 1,\nColumn: 17",
         )
 
     def test_rollback_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
@@ -1253,7 +1253,7 @@ class TestSquash:
         assert result.exit_code == 1, result.output
 
         cli_runner.assert_output(
-            "Can not extract table from DDL statement in migration \n20210101_01_abcd-first-migration",
+            "20210101_01_abcd-first-migration: Expected table name but got lock. Line: 1,\nColumn: 17",
         )
 
     def test_prompt_update(self, migration_file_factory, cli_runner):

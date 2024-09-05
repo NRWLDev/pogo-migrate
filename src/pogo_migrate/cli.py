@@ -509,7 +509,6 @@ def remove(
 @app.command("squash")
 def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
     migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
-    backend: str = typer.Option("sqlparse", "-b", "--backend"),
     *,
     backup: bool = typer.Option(False, "--backup/ ", help="Keep .bak copy of original files."),  # noqa: FBT003
     source: bool = typer.Option(False, "--source/ ", help="Add comment for source migration to each statement."),  # noqa: FBT003
@@ -590,7 +589,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
         for i, apply in enumerate(apply_statements):
             try:
-                parsed = squash.parse(apply) if backend == "sqlparse" else squash.parse_sqlglot(apply)
+                parsed = squash.parse_sqlglot(apply)
             except squash.ParseError as e:
                 logger.error("%s: %s", migration.id, str(e))
                 logger.warning(apply)
@@ -625,7 +624,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         rollbacks_ = defaultdict(list)
         for rollback in reversed(rollback_statements):
             try:
-                parsed = squash.parse(rollback) if backend == "sqlparse" else squash.parse_sqlglot(rollback)
+                parsed = squash.parse_sqlglot(rollback)
             except squash.ParseError as e:
                 logger.error("%s: %s", migration.id, str(e))
                 logger.warning(rollback)
