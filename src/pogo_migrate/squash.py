@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
 
+import sqlglot
 import sqlparse
+from sqlglot import expressions as exp
 
 from pogo_migrate.migration import Migration
 
@@ -138,8 +141,12 @@ def parse(statement: str) -> ParsedStatement:
             CREATE [UNIQUE] INDEX CONCURRENTLY [IF NOT EXISTS] ident ON tbl_ident;
             DROP INDEX CONCURRENTLY [IF EXISTS] ident;
             """
-            on_idx, _on_keyword = parsed.token_next_by(idx=exists_idx or idx, m=(sqlparse.tokens.Keyword, "ON"))
-            idx, ident_token = parsed.token_next(on_idx or exists_idx or idx, skip_ws=True, skip_cm=True)
+            c_idx, _c_keyword = parsed.token_next_by(idx=exists_idx or idx, m=(sqlparse.tokens.Keyword, "CONCURRENTLY"))
+            on_idx, _on_keyword = parsed.token_next_by(
+                idx=c_idx or exists_idx or idx,
+                m=(sqlparse.tokens.Keyword, "ON"),
+            )
+            idx, ident_token = parsed.token_next(on_idx or c_idx or exists_idx or idx, skip_ws=True, skip_cm=True)
             identifier = (
                 ident_token.get_real_name()
                 if isinstance(ident_token, (sqlparse.sql.Identifier, sqlparse.sql.Function))
@@ -157,3 +164,27 @@ def parse(statement: str) -> ParsedStatement:
     logger.debug(parsed.tokens)
 
     return ParsedStatement(statement, type_, identifier)
+
+
+class ParseError(Exception): ...
+
+
+def parse_sqlglot(statement: str) -> ParsedStatement:
+    try:
+        parsed = sqlglot.parse_one(statement, read="postgres", dialect="postgres")
+    except sqlglot.errors.ParseError as e:
+        r = r"(?P<msg>Expected table name but got) <.*text: (?P<text>\w+), .*>\. Line (?P<line>\d+), Col: (?P<column>\d+)\.\s(?P<statement>.*)"
+        m = re.match(r, str(e))
+        msg = "{msg} {text}. Line: {line}, Column: {column}".format(**m.groupdict())
+        raise ParseError(msg) from e
+
+    identifier = None
+    if isinstance(parsed, (exp.Create, exp.Alter, exp.Drop)):
+        table = parsed.find(exp.Table)
+        identifier = table.name
+    elif isinstance(parsed, exp.Command):
+        # Unhandled syntax by sqlglot, fallback to sqlparse
+        logger.warning("sqlglot failed to parse, falling back to sqlparse.")
+        return parse(statement)
+
+    return ParsedStatement(statement, parsed.__class__.__name__.upper(), identifier)

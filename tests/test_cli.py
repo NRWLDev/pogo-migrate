@@ -203,6 +203,36 @@ class TestNew:
         )
 
     @pytest.mark.usefixtures("pyproject")
+    def test_subprocess_call(self, monkeypatch, tmp_path, cli_runner):
+        f = tmp_path / "tmpfile"
+        f.touch()
+        mock_file = mock.MagicMock()
+        mock_file.name = str(f)
+
+        monkeypatch.setenv("EDITOR", "vim")
+        monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
+        monkeypatch.setattr(cli, "NamedTemporaryFile", mock.Mock(return_value=mock_file))
+
+        cli_runner.invoke(["new"])
+
+        assert cli.subprocess.call.call_args == mock.call(["vim", str(f)])
+
+    @pytest.mark.usefixtures("pyproject")
+    def test_subprocess_call_dynamic_editor(self, monkeypatch, tmp_path, cli_runner):
+        f = tmp_path / "tmpfile"
+        f.touch()
+        mock_file = mock.MagicMock()
+        mock_file.name = str(f)
+
+        monkeypatch.setenv("EDITOR", "vim {}")
+        monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
+        monkeypatch.setattr(cli, "NamedTemporaryFile", mock.Mock(return_value=mock_file))
+
+        cli_runner.invoke(["new"])
+
+        assert cli.subprocess.call.call_args == mock.call(["vim", str(f)])
+
+    @pytest.mark.usefixtures("pyproject")
     def test_file_written(self, monkeypatch, cli_runner, cwd):
         monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
@@ -1214,7 +1244,7 @@ class TestSquash:
         DROP TABLE one;
         """)
 
-    def test_apply_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
+    def test_apply_sqlglot_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
         migration_file_factory(
             "20210101_01_abcd-first-migration",
             "sql",
@@ -1232,10 +1262,31 @@ class TestSquash:
         assert result.exit_code == 1, result.output
 
         cli_runner.assert_output(
-            "Can not extract table from DDL statement in migration \n20210101_01_abcd-first-migration",
+            "20210101_01_abcd-first-migration: Expected table name but got lock. Line: 1,\nColumn: 17",
         )
 
-    def test_rollback_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
+    def test_apply_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
+        migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            DROP AGGREGATE lock;
+            -- migrate: rollback
+            """),
+        )
+
+        result = cli_runner.invoke(["squash"])
+        assert result.exit_code == 1, result.output
+
+        cli_runner.assert_output(
+            "Can not extract table from DDL statement in migration\n20210101_01_abcd-first-migration",
+        )
+
+    def test_rollback_sqlglot_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
         migration_file_factory(
             "20210101_01_abcd-first-migration",
             "sql",
@@ -1253,7 +1304,28 @@ class TestSquash:
         assert result.exit_code == 1, result.output
 
         cli_runner.assert_output(
-            "Can not extract table from DDL statement in migration \n20210101_01_abcd-first-migration",
+            "20210101_01_abcd-first-migration: Expected table name but got lock. Line: 1,\nColumn: 17",
+        )
+
+    def test_rollback_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
+        migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            CREATE AGGREGATE lock;
+            """),
+        )
+
+        result = cli_runner.invoke(["squash"])
+        assert result.exit_code == 1, result.output
+
+        cli_runner.assert_output(
+            "Can not extract table from DDL statement in migration\n20210101_01_abcd-first-migration",
         )
 
     def test_prompt_update(self, migration_file_factory, cli_runner):
