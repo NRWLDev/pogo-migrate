@@ -175,16 +175,13 @@ def parse_sqlglot(statement: str) -> ParsedStatement:
     except sqlglot.errors.ParseError as e:
         r = r"(?P<msg>Expected table name but got) <.*text: (?P<text>\w+), .*>\. Line (?P<line>\d+), Col: (?P<column>\d+)\.\s(?P<statement>.*)"
         m = re.match(r, str(e))
-        msg = str(e)
-        if m:
-            msg = "{msg} {text}. Line: {line}, Column: {column}".format(**m.groupdict())
+        msg = "{msg} {text}. Line: {line}, Column: {column}".format(**m.groupdict())
         raise ParseError(msg) from e
 
     identifier = None
     if isinstance(parsed, (exp.Create, exp.Alter, exp.Drop)):
-        for table in parsed.find_all(exp.Table):
-            identifier = table.name
-            break
+        table = parsed.find(exp.Table)
+        identifier = table.name
     elif isinstance(parsed, exp.Command):
         # Unhandled syntax by sqlglot, fallback to sqlparse
         logger.warning("sqlglot failed to parse, falling back to sqlparse.")
