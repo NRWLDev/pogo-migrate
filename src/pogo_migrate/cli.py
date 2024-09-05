@@ -697,7 +697,7 @@ def validate(
         max=3,
     ),
 ) -> None:
-    """Validate migrations.
+    """Validate migrations [EXPERIMENTAL].
 
     Best effort pass through to make sure identifiers aren't keywords.
     """
