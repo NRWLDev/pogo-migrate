@@ -1,5 +1,4 @@
 import os
-from unittest import mock
 
 import pytest
 
@@ -47,15 +46,14 @@ def test_find_config_not_found():
 
 
 @pytest.mark.usefixtures("cwd")
-def test_load_config_not_found(monkeypatch):
-    monkeypatch.setattr(config.logger, "error", mock.Mock())
+def test_load_config_not_found():
     with pytest.raises(exceptions.InvalidConfigurationError) as e:
         config.load_config()
 
     assert str(e.value) == "No configuration found, missing pyproject.toml, run 'pogo init ...'"
 
 
-def test_load_config_no_configuration(monkeypatch, cwd):
+def test_load_config_no_configuration(cwd):
     p = cwd / "pyproject.toml"
 
     with p.open("w") as f:
@@ -64,14 +62,13 @@ def test_load_config_no_configuration(monkeypatch, cwd):
 migrations = "./migrations"
 database_config = "{POSTGRES_DSN}"
 """)
-    monkeypatch.setattr(config.logger, "error", mock.Mock())
     with pytest.raises(exceptions.InvalidConfigurationError) as e:
         config.load_config()
 
     assert str(e.value) == "No configuration found, run 'pogo init ...'"
 
 
-def test_load_config_found(monkeypatch, cwd):
+def test_load_config_found(cwd):
     p = cwd / "pyproject.toml"
 
     with p.open("w") as f:
@@ -80,7 +77,6 @@ def test_load_config_found(monkeypatch, cwd):
 migrations = "./migrations"
 database_config = "{POSTGRES_DSN}"
 """)
-    monkeypatch.setattr(config.logger, "error", mock.Mock())
     c = config.load_config()
 
     assert c == config.Config(
@@ -90,7 +86,7 @@ database_config = "{POSTGRES_DSN}"
     )
 
 
-def test_load_config_database_config(monkeypatch, cwd):
+def test_load_config_database_config(cwd):
     p = cwd / "pyproject.toml"
 
     with p.open("w") as f:
@@ -99,7 +95,6 @@ def test_load_config_database_config(monkeypatch, cwd):
 migrations = "./migrations"
 database_config = "{POSTGRES_DSN}"
 """)
-    monkeypatch.setattr(config.logger, "error", mock.Mock())
     c = config.load_config()
 
     assert c == config.Config(

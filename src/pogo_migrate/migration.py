@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
-import logging
 import re
 import typing as t
 
@@ -14,8 +13,6 @@ if t.TYPE_CHECKING:
     from pathlib import Path
 
     import asyncpg
-
-logger = logging.getLogger(__name__)
 
 
 def strip_comments(statement: str) -> str:

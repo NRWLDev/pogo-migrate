@@ -425,8 +425,7 @@ class TestHistory:
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
-            Database connection can not be established, migration status can not be
-            determined.
+            Database connection can not be established, migration status can not be determined.
             STATUS    ID                        FORMAT
             --------  ------------------------  --------
             U         20210101_02_rando-commit  sql
@@ -651,7 +650,7 @@ class TestApply:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["apply", "-vv"])
+        result = cli_runner.invoke(["apply", "-vvv"])
         assert result.exit_code == 1, result.output
         assert 'DuplicateTableError: relation "table_one" already exists' in result.output
 
@@ -751,7 +750,7 @@ class TestRollback:
             DROP TABLE table_one;
             """),
         )
-        result = cli_runner.invoke(["rollback", "-vv"])
+        result = cli_runner.invoke(["rollback", "-vvv"])
         assert result.exit_code == 1, result.output
         assert 'UndefinedTableError: table "table_one" does not exist' in result.output
 
@@ -813,18 +812,22 @@ class TestValidate:
             CREATE INDEX foo;
             -- migrate: rollback
             DROP INDEX;
+            DROP AGGREGATE lock;
             """),
         )
         result = cli_runner.invoke(["validate", "-v"])
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
-            Can not extract table from DDL statement in migration 20210101_01_rando-commit,
-            check that table name is not a reserved word.
+            20210101_01_rando-commit: Expected table name but got None. Line: 1, Column: 10
             DROP TABLE;
-            Can not extract table from DDL statement in migration 20210101_02_rando-commit,
-            check that table name is not a reserved word.
+            20210101_02_rando-commit: Expected table name but got None. Line: 1, Column: 16
+            CREATE INDEX foo;
+            20210101_02_rando-commit: Expected table name but got None. Line: 1, Column: 10
             DROP INDEX;
+            sqlglot failed to parse, falling back to sqlparse.
+            Can not extract table from DDL statement in migration 20210101_02_rando-commit, check that table name is not a reserved word.
+            DROP AGGREGATE lock;
             """),
         )
 
@@ -847,18 +850,22 @@ class TestValidate:
             async def rollback(db):
                 await db.execute("DROP INDEX;")
                 await db.execute("DROP TABLE;")
+                await db.execute("DROP AGGREGATE lock;")
             '''),
         )
         result = cli_runner.invoke(["validate", "-v"])
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
-            Can not extract table from DDL statement in migration 20210101_01_rando-commit,
-            check that table name is not a reserved word.
+            20210101_01_rando-commit: Expected table name but got None. Line: 1, Column: 16
+            CREATE INDEX foo;
+            20210101_01_rando-commit: Expected table name but got None. Line: 1, Column: 10
             DROP INDEX;
-            Can not extract table from DDL statement in migration 20210101_01_rando-commit,
-            check that table name is not a reserved word.
+            20210101_01_rando-commit: Expected table name but got None. Line: 1, Column: 10
             DROP TABLE;
+            sqlglot failed to parse, falling back to sqlparse.
+            Can not extract table from DDL statement in migration 20210101_01_rando-commit, check that table name is not a reserved word.
+            DROP AGGREGATE lock;
             """),
         )
 
@@ -912,10 +919,8 @@ class TestValidate:
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
-            Can't validate python migration 20210101_01_abcde-first-migration (apply),
-            skipping...
-            Can't validate python migration 20210101_01_abcde-first-migration (rollback),
-            skipping...
+            Can't validate python migration 20210101_01_abcde-first-migration (apply), skipping...
+            Can't validate python migration 20210101_01_abcde-first-migration (rollback), skipping...
             """),
         )
 
@@ -1221,8 +1226,7 @@ class TestMigrateYoyo:
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
-            Python files can not be migrated reliably, please manually update
-            'migrations/20210101_01_rando-commit.py'.
+            Python files can not be migrated reliably, please manually update 'migrations/20210101_01_rando-commit.py'.
             """),
         )
 
@@ -1426,7 +1430,7 @@ class TestSquash:
         assert result.exit_code == 1, result.output
 
         cli_runner.assert_output(
-            "20210101_01_abcd-first-migration: Expected table name but got lock. Line: 1,\nColumn: 17",
+            "20210101_01_abcd-first-migration: Expected table name but got lock. Line: 1, Column: 17",
         )
 
     def test_apply_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
@@ -1447,7 +1451,7 @@ class TestSquash:
         assert result.exit_code == 1, result.output
 
         cli_runner.assert_output(
-            "Can not extract table from DDL statement in migration\n20210101_01_abcd-first-migration",
+            "Can not extract table from DDL statement in migration 20210101_01_abcd-first-migration",
         )
 
     def test_rollback_sqlglot_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
@@ -1468,7 +1472,7 @@ class TestSquash:
         assert result.exit_code == 1, result.output
 
         cli_runner.assert_output(
-            "20210101_01_abcd-first-migration: Expected table name but got lock. Line: 1,\nColumn: 17",
+            "20210101_01_abcd-first-migration: Expected table name but got lock. Line: 1, Column: 17",
         )
 
     def test_rollback_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
@@ -1489,7 +1493,7 @@ class TestSquash:
         assert result.exit_code == 1, result.output
 
         cli_runner.assert_output(
-            "Can not extract table from DDL statement in migration\n20210101_01_abcd-first-migration",
+            "Can not extract table from DDL statement in migration 20210101_01_abcd-first-migration",
         )
 
     def test_prompt_update(self, migration_file_factory, cli_runner):

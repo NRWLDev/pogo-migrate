@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import logging
 import re
+import typing as t
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
@@ -12,7 +12,8 @@ from sqlglot import expressions as exp
 
 from pogo_migrate.migration import Migration
 
-logger = logging.getLogger(__name__)
+if t.TYPE_CHECKING:
+    from pogo_migrate.context import Context
 
 
 squash_sql_template = dedent(
@@ -33,8 +34,8 @@ squash_sql_template = dedent(
 )
 
 
-def remove(current: Migration, dependent: Migration | None, *, backup: bool = False) -> None:
-    logger.warning("Removing %s", current.id)
+def remove(context: Context, current: Migration, dependent: Migration | None, *, backup: bool = False) -> None:
+    context.warning("Removing %s", current.id)
     new_depends = ", ".join(current.depends_ids)
     if dependent:
         content = dependent.path.read_text()
@@ -112,23 +113,7 @@ class ParsedStatement:
     identifier: str | None
 
 
-"""
-            parsed = sqlglot.parse_one(apply, read="postgres", dialect="postgres")
-            # print(parsed)
-            # print(parsed.tokens)
-            print(parsed)
-            if isinstance(parsed, (exp.Create, exp.AlterTable, exp.Drop)):
-                for table in parsed.find_all(exp.Table):
-                    statements["__data"].append(apply)
-                    break
-                else:
-                    print("no identifier")
-            else:
-                statements["__data"].append(apply)
-"""
-
-
-def parse(statement: str) -> ParsedStatement:
+def parse(context: Context, statement: str) -> ParsedStatement:
     parsed = sqlparse.parse(statement)[0]
 
     type_ = parsed.get_type()
@@ -177,7 +162,7 @@ def parse(statement: str) -> ParsedStatement:
                 else None
             )
 
-    logger.debug(parsed.tokens)
+    context.debug(parsed.tokens)
 
     return ParsedStatement(statement, type_, identifier)
 
@@ -185,11 +170,11 @@ def parse(statement: str) -> ParsedStatement:
 class ParseError(Exception): ...
 
 
-def parse_sqlglot(statement: str) -> ParsedStatement:
+def parse_sqlglot(context: Context, statement: str) -> ParsedStatement:
     try:
         parsed = sqlglot.parse_one(statement, read="postgres", dialect="postgres")
     except sqlglot.errors.ParseError as e:
-        r = r"(?P<msg>Expected table name but got) <.*text: (?P<text>\w+), .*>\. Line (?P<line>\d+), Col: (?P<column>\d+)\.\s(?P<statement>.*)"
+        r = r"(?P<msg>Expected table name but got) (<.*text: )?(?P<text>\w+)(, .*>)?\. Line (?P<line>\d+), Col: (?P<column>\d+)\.\n(?P<statement>.*)"
         m = re.match(r, str(e))
         msg = "{msg} {text}. Line: {line}, Column: {column}".format(**m.groupdict())
         raise ParseError(msg) from e
@@ -200,7 +185,7 @@ def parse_sqlglot(statement: str) -> ParsedStatement:
         identifier = table.name
     elif isinstance(parsed, exp.Command):
         # Unhandled syntax by sqlglot, fallback to sqlparse
-        logger.warning("sqlglot failed to parse, falling back to sqlparse.")
-        return parse(statement)
+        context.warning("sqlglot failed to parse, falling back to sqlparse.")
+        return parse(context, statement)
 
     return ParsedStatement(statement, parsed.__class__.__name__.upper(), identifier)
