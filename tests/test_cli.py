@@ -863,6 +863,33 @@ class TestValidate:
         )
 
     @pytest.mark.usefixtures("migrations", "pyproject")
+    def test_validate_py_parametrized(self, cli_runner, migration_file_factory):
+        migration_file_factory(
+            "20210101_01_abcde-first-migration",
+            "py",
+            dedent('''
+            """
+            second migration
+            """
+            __depends__ = []
+            __transaction__ = False
+
+            async def apply(db):
+                a = "1"
+                await db.execute('UPDATE "table" SET col = $1', a)
+
+            async def rollback(db):
+                await db.execute(query='DROP TABLE "table";')
+            '''),
+        )
+        result = cli_runner.invoke(["validate", "-v"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
     def test_validate_skips_py_error(self, cli_runner, migration_file_factory):
         migration_file_factory(
             "20210101_01_abcde-first-migration",

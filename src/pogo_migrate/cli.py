@@ -725,10 +725,9 @@ def validate(
             except Exception:  # noqa: BLE001
                 logger.warning("Can't validate python migration %s (rollback), skipping...", migration.id)
 
-            statements = [c[0][0] for c in mock_asyncpg.execute.call_args_list]
-            statements += [c[0][0] for c in mock_asyncpg.fetch.call_args_list]
-            statements += [c[0][0] for c in mock_asyncpg.fetchrow.call_args_list]
-
+            statements = [c[1].get("query") or c[0][0] for c in mock_asyncpg.execute.call_args_list]
+            statements += [c[1].get("query") or c[0][0] for c in mock_asyncpg.fetch.call_args_list]
+            statements += [c[1].get("query") or c[0][0] for c in mock_asyncpg.fetchrow.call_args_list]
         else:
             _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
             statements = apply_statements + rollback_statements
