@@ -829,7 +829,41 @@ class TestValidate:
         )
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    def test_validate_skips_py(self, cli_runner, migration_file_factory):
+    def test_validate_checks_py(self, cli_runner, migration_file_factory):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "py",
+            dedent('''
+            """
+            second migration
+            """
+            __depends__ = []
+            __transaction__ = False
+
+            async def apply(db):
+                await db.execute("CREATE TABLE one();")
+                await db.execute("CREATE INDEX foo;")
+
+            async def rollback(db):
+                await db.execute("DROP INDEX;")
+                await db.execute("DROP TABLE;")
+            '''),
+        )
+        result = cli_runner.invoke(["validate", "-v"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Can not extract table from DDL statement in migration 20210101_01_rando-commit,
+            check that table name is not a reserved word.
+            DROP INDEX;
+            Can not extract table from DDL statement in migration 20210101_01_rando-commit,
+            check that table name is not a reserved word.
+            DROP TABLE;
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    def test_validate_py_parametrized(self, cli_runner, migration_file_factory):
         migration_file_factory(
             "20210101_01_abcde-first-migration",
             "py",
@@ -841,17 +875,47 @@ class TestValidate:
             __transaction__ = False
 
             async def apply(db):
-                await db.execute("CREATE TABLE two();")
+                a = "1"
+                await db.execute('UPDATE "table" SET col = $1', a)
 
             async def rollback(db):
-                await db.execute("DROP TABLE two;")
+                await db.execute(query='DROP TABLE "table";')
             '''),
         )
         result = cli_runner.invoke(["validate", "-v"])
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
-            Can't validate python migration 20210101_01_abcde-first-migration, skipping...
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    def test_validate_skips_py_error(self, cli_runner, migration_file_factory):
+        migration_file_factory(
+            "20210101_01_abcde-first-migration",
+            "py",
+            dedent('''
+            """
+            second migration
+            """
+            __depends__ = []
+            __transaction__ = False
+
+            async def apply(db):
+                raise Exception
+
+            async def rollback(db):
+                raise Exception
+            '''),
+        )
+        result = cli_runner.invoke(["validate", "-v"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Can't validate python migration 20210101_01_abcde-first-migration (apply),
+            skipping...
+            Can't validate python migration 20210101_01_abcde-first-migration (rollback),
+            skipping...
             """),
         )
 
