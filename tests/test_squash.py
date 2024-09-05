@@ -568,3 +568,42 @@ def test_parse_sqlglot_identifier_aborts_at_table_keyword(statement):
     # Original code would pick up column identifier.
     with pytest.raises(squash.ParseError, match="Expected table name but got lock."):
         squash.parse_sqlglot(statement)
+
+
+@pytest.mark.parametrize(
+    ("statement", "expected_identifier"),
+    [
+        ("CREATE TABLE tbl (id INT);", "tbl"),
+        ("CREATE TABLE IF NOT EXISTS tbl (id INT);", "tbl"),
+        ("CREATE INDEX ix_table_id ON tbl (id);", "tbl"),
+        ("CREATE INDEX ix_table_id ON tbl USING btree (id);", "tbl"),
+        ("CREATE INDEX IF NOT EXISTS ix_table_id ON tbl USING btree (id);", "tbl"),
+        ("CREATE UNIQUE INDEX ix_table_id ON tbl USING btree (id);", "tbl"),
+        ("CREATE UNIQUE INDEX IF NOT EXISTS ix_table_id ON tbl USING btree (id);", "tbl"),
+        ("CREATE INDEX CONCURRENTLY ix_table_id ON tbl USING btree (id);", "tbl"),
+        ("CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_table_id ON tbl USING btree (id);", "tbl"),
+        ("CREATE AGGREGATE my_agg (numeric) ( SFUNC = numeric_mul, STYPE=numeric );", "my_agg"),
+        ("CREATE AGGREGATE IF NOT EXISTS my_agg (numeric) ( SFUNC = numeric_mul, STYPE=numeric );", "my_agg"),
+        ("CREATE EXTENSION pgcrypto;", "pgcrypto"),
+        ("CREATE EXTENSION IF NOT EXISTS pgcrypto;", "pgcrypto"),
+        ('ALTER TABLE "lock" ADD COLUMN id INT;', "lock"),
+        ('ALTER TABLE "lock" ALTER COLUMN id INT;', "lock"),
+        ("DROP TABLE tbl;", "tbl"),
+        ("DROP TABLE IF EXISTS tbl;", "tbl"),
+        ("DROP AGGREGATE my_agg (numeric);", "my_agg"),
+        ("DROP AGGREGATE IF EXISTS my_agg (numeric);", "my_agg"),
+        ("DROP EXTENSION IF EXISTS pgcrypto;", "pgcrypto"),
+        ("DROP EXTENSION pgcrypto;", "pgcrypto"),
+        ("DROP INDEX ix_table_id;", "ix_table_id"),
+        ("DROP INDEX IF EXISTS ix_table_id;", "ix_table_id"),
+        ("DROP INDEX CONCURRENTLY ix_table_id;", "ix_table_id"),
+        ("DROP INDEX CONCURRENTLY IF EXISTS ix_table_id;", "ix_table_id"),
+        ("UPDATE tbl SET id = 1;", None),
+        ("INSERT INTO TABLE tbl (id) VALUES (1);", None),
+        ("DELETE FROM TABLE tbl WHERE id = 1", None),
+    ],
+)
+def test_parse_identifier(statement, expected_identifier):
+    parsed = squash.parse(statement)
+
+    assert parsed.identifier == expected_identifier

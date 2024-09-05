@@ -141,8 +141,12 @@ def parse(statement: str) -> ParsedStatement:
             CREATE [UNIQUE] INDEX CONCURRENTLY [IF NOT EXISTS] ident ON tbl_ident;
             DROP INDEX CONCURRENTLY [IF EXISTS] ident;
             """
-            on_idx, _on_keyword = parsed.token_next_by(idx=exists_idx or idx, m=(sqlparse.tokens.Keyword, "ON"))
-            idx, ident_token = parsed.token_next(on_idx or exists_idx or idx, skip_ws=True, skip_cm=True)
+            c_idx, _c_keyword = parsed.token_next_by(idx=exists_idx or idx, m=(sqlparse.tokens.Keyword, "CONCURRENTLY"))
+            on_idx, _on_keyword = parsed.token_next_by(
+                idx=c_idx or exists_idx or idx,
+                m=(sqlparse.tokens.Keyword, "ON"),
+            )
+            idx, ident_token = parsed.token_next(on_idx or c_idx or exists_idx or idx, skip_ws=True, skip_cm=True)
             identifier = (
                 ident_token.get_real_name()
                 if isinstance(ident_token, (sqlparse.sql.Identifier, sqlparse.sql.Function))
