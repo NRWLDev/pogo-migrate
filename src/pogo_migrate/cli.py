@@ -588,7 +588,13 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
 
         _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
         for i, apply in enumerate(apply_statements):
-            parsed = squash.parse(apply)
+            try:
+                parsed = squash.parse_sqlglot(apply)
+            except squash.ParseError as e:
+                logger.error("%s: %s", migration.id, str(e))
+                logger.warning(apply)
+                raise typer.Exit(code=1) from e
+
             if source:
                 parsed.statement = f"{parsed.statement} -- source: {migration.id}"
 
@@ -617,7 +623,12 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
 
         rollbacks_ = defaultdict(list)
         for rollback in reversed(rollback_statements):
-            parsed = squash.parse(rollback)
+            try:
+                parsed = squash.parse_sqlglot(rollback)
+            except squash.ParseError as e:
+                logger.error("%s: %s", migration.id, str(e))
+                logger.warning(rollback)
+                raise typer.Exit(code=1) from e
             if source:
                 parsed.statement = f"{parsed.statement} -- source: {migration.id}"
 
@@ -686,7 +697,7 @@ def validate(
         max=3,
     ),
 ) -> None:
-    """Validate migrations.
+    """Validate migrations [EXPERIMENTAL].
 
     Best effort pass through to make sure identifiers aren't keywords.
     """
@@ -707,11 +718,22 @@ def validate(
             try:
                 asyncio.run(migration.apply(mock_asyncpg))
             except Exception:  # noqa: BLE001
-                logger.warning("Can't validate python migration %s, skipping...", migration.id)
-            continue
+                logger.warning("Can't validate python migration %s (apply), skipping...", migration.id)
 
-        _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
-        for statement in apply_statements + rollback_statements:
+            try:
+                asyncio.run(migration.rollback(mock_asyncpg))
+            except Exception:  # noqa: BLE001
+                logger.warning("Can't validate python migration %s (rollback), skipping...", migration.id)
+
+            statements = [c[0][0] for c in mock_asyncpg.execute.call_args_list]
+            statements += [c[0][0] for c in mock_asyncpg.fetch.call_args_list]
+            statements += [c[0][0] for c in mock_asyncpg.fetchrow.call_args_list]
+
+        else:
+            _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
+            statements = apply_statements + rollback_statements
+
+        for statement in statements:
             parsed = squash.parse(statement)
 
             if parsed.statement_type in ("CREATE", "ALTER", "DROP") and parsed.identifier is None:

@@ -203,6 +203,36 @@ class TestNew:
         )
 
     @pytest.mark.usefixtures("pyproject")
+    def test_subprocess_call(self, monkeypatch, tmp_path, cli_runner):
+        f = tmp_path / "tmpfile"
+        f.touch()
+        mock_file = mock.MagicMock()
+        mock_file.name = str(f)
+
+        monkeypatch.setenv("EDITOR", "vim")
+        monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
+        monkeypatch.setattr(cli, "NamedTemporaryFile", mock.Mock(return_value=mock_file))
+
+        cli_runner.invoke(["new"])
+
+        assert cli.subprocess.call.call_args == mock.call(["vim", str(f)])
+
+    @pytest.mark.usefixtures("pyproject")
+    def test_subprocess_call_dynamic_editor(self, monkeypatch, tmp_path, cli_runner):
+        f = tmp_path / "tmpfile"
+        f.touch()
+        mock_file = mock.MagicMock()
+        mock_file.name = str(f)
+
+        monkeypatch.setenv("EDITOR", "vim {}")
+        monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
+        monkeypatch.setattr(cli, "NamedTemporaryFile", mock.Mock(return_value=mock_file))
+
+        cli_runner.invoke(["new"])
+
+        assert cli.subprocess.call.call_args == mock.call(["vim", str(f)])
+
+    @pytest.mark.usefixtures("pyproject")
     def test_file_written(self, monkeypatch, cli_runner, cwd):
         monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
@@ -726,6 +756,143 @@ class TestRollback:
         assert 'UndefinedTableError: table "table_one" does not exist' in result.output
 
 
+class TestValidate:
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_validate_clean(self, cli_runner, migration_file_factory):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE table_one()
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            CREATE TABLE table_two()
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["validate", "-v"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output("")
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_validate_invalid_sql(self, cli_runner, migration_file_factory):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE table_one();
+            -- migrate: rollback
+            DROP TABLE;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            CREATE INDEX foo;
+            -- migrate: rollback
+            DROP INDEX;
+            """),
+        )
+        result = cli_runner.invoke(["validate", "-v"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Can not extract table from DDL statement in migration 20210101_01_rando-commit,
+            check that table name is not a reserved word.
+            DROP TABLE;
+            Can not extract table from DDL statement in migration 20210101_02_rando-commit,
+            check that table name is not a reserved word.
+            DROP INDEX;
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    def test_validate_checks_py(self, cli_runner, migration_file_factory):
+        migration_file_factory(
+            "20210101_01_abcde-first-migration",
+            "py",
+            dedent('''
+            """
+            second migration
+            """
+            __depends__ = []
+            __transaction__ = False
+
+            async def apply(db):
+                await db.execute("CREATE TABLE one();")
+                await db.execute("CREATE INDEX foo;")
+
+            async def rollback(db):
+                await db.execute("DROP INDEX;")
+                await db.execute("DROP TABLE;")
+            '''),
+        )
+        result = cli_runner.invoke(["validate", "-v"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Can not extract table from DDL statement in migration
+            20210101_01_abcde-first-migration, check that table name is not a reserved word.
+            DROP INDEX;
+            Can not extract table from DDL statement in migration
+            20210101_01_abcde-first-migration, check that table name is not a reserved word.
+            DROP TABLE;
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    def test_validate_skips_py_error(self, cli_runner, migration_file_factory):
+        migration_file_factory(
+            "20210101_01_abcde-first-migration",
+            "py",
+            dedent('''
+            """
+            second migration
+            """
+            __depends__ = []
+            __transaction__ = False
+
+            async def apply(db):
+                raise Exception
+
+            async def rollback(db):
+                raise Exception
+            '''),
+        )
+        result = cli_runner.invoke(["validate", "-v"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Can't validate python migration 20210101_01_abcde-first-migration (apply),
+            skipping...
+            Can't validate python migration 20210101_01_abcde-first-migration (rollback),
+            skipping...
+            """),
+        )
+
+
 class TestMark:
     @pytest.mark.usefixtures("migrations", "pyproject")
     def test_mark_no_migrations(self, cli_runner):
@@ -1214,7 +1381,7 @@ class TestSquash:
         DROP TABLE one;
         """)
 
-    def test_apply_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
+    def test_apply_sqlglot_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
         migration_file_factory(
             "20210101_01_abcd-first-migration",
             "sql",
@@ -1232,10 +1399,31 @@ class TestSquash:
         assert result.exit_code == 1, result.output
 
         cli_runner.assert_output(
-            "Can not extract table from DDL statement in migration \n20210101_01_abcd-first-migration",
+            "20210101_01_abcd-first-migration: Expected table name but got lock. Line: 1,\nColumn: 17",
         )
 
-    def test_rollback_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
+    def test_apply_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
+        migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            DROP AGGREGATE lock;
+            -- migrate: rollback
+            """),
+        )
+
+        result = cli_runner.invoke(["squash"])
+        assert result.exit_code == 1, result.output
+
+        cli_runner.assert_output(
+            "Can not extract table from DDL statement in migration\n20210101_01_abcd-first-migration",
+        )
+
+    def test_rollback_sqlglot_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
         migration_file_factory(
             "20210101_01_abcd-first-migration",
             "sql",
@@ -1253,7 +1441,28 @@ class TestSquash:
         assert result.exit_code == 1, result.output
 
         cli_runner.assert_output(
-            "Can not extract table from DDL statement in migration \n20210101_01_abcd-first-migration",
+            "20210101_01_abcd-first-migration: Expected table name but got lock. Line: 1,\nColumn: 17",
+        )
+
+    def test_rollback_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
+        migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            CREATE AGGREGATE lock;
+            """),
+        )
+
+        result = cli_runner.invoke(["squash"])
+        assert result.exit_code == 1, result.output
+
+        cli_runner.assert_output(
+            "Can not extract table from DDL statement in migration\n20210101_01_abcd-first-migration",
         )
 
     def test_prompt_update(self, migration_file_factory, cli_runner):
