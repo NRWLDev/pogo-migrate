@@ -203,6 +203,36 @@ class TestNew:
         )
 
     @pytest.mark.usefixtures("pyproject")
+    def test_subprocess_call(self, monkeypatch, tmp_path, cli_runner):
+        f = tmp_path / "tmpfile"
+        f.touch()
+        mock_file = mock.MagicMock()
+        mock_file.name = str(f)
+
+        monkeypatch.setenv("EDITOR", "vim")
+        monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
+        monkeypatch.setattr(cli, "NamedTemporaryFile", mock.Mock(return_value=mock_file))
+
+        cli_runner.invoke(["new"])
+
+        assert cli.subprocess.call.call_args == mock.call(["vim", str(f)])
+
+    @pytest.mark.usefixtures("pyproject")
+    def test_subprocess_call_dynamic_editor(self, monkeypatch, tmp_path, cli_runner):
+        f = tmp_path / "tmpfile"
+        f.touch()
+        mock_file = mock.MagicMock()
+        mock_file.name = str(f)
+
+        monkeypatch.setenv("EDITOR", "vim {}")
+        monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
+        monkeypatch.setattr(cli, "NamedTemporaryFile", mock.Mock(return_value=mock_file))
+
+        cli_runner.invoke(["new"])
+
+        assert cli.subprocess.call.call_args == mock.call(["vim", str(f)])
+
+    @pytest.mark.usefixtures("pyproject")
     def test_file_written(self, monkeypatch, cli_runner, cwd):
         monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
