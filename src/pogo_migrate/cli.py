@@ -498,7 +498,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         max=3,
     ),
 ) -> None:
-    """Squash migrations. [EXPERIMENTAL]
+    """Squash migrations [EXPERIMENTAL].
 
     Python migrations and non transaction based transactions are skipped by default.
 
