@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import logging
 import os
 import typing as t
 from pathlib import Path
@@ -10,9 +9,6 @@ from string import Formatter
 import rtoml
 
 from pogo_migrate import exceptions
-
-logger = logging.getLogger(__name__)
-
 
 CONFIG_FILENAME = "pyproject.toml"
 

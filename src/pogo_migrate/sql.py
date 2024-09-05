@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import typing as t
 
 import asyncpg
@@ -9,8 +8,6 @@ from pogo_migrate.migration import Migration
 
 if t.TYPE_CHECKING:
     from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 
 async def get_connection(connection_string: str) -> asyncpg.Connection:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import logging
 import typing as t
 
 from pogo_migrate import exceptions, sql
@@ -11,8 +10,7 @@ if t.TYPE_CHECKING:
     import asyncpg
 
     from pogo_migrate.config import Config
-
-logger = logging.getLogger(__name__)
+    from pogo_migrate.context import Context
 
 
 @contextlib.asynccontextmanager
@@ -33,7 +31,7 @@ async def transaction(db: asyncpg.Connection, migration: Migration) -> None:
             await tr.commit()
 
 
-async def apply(config: Config, db: asyncpg.Connection) -> None:
+async def apply(context: Context, config: Config, db: asyncpg.Connection) -> None:
     await sql.ensure_pogo_sync(db)
     migrations = await sql.read_migrations(config.migrations, db)
     migrations = topological_sort([m.load() for m in migrations])
@@ -42,7 +40,7 @@ async def apply(config: Config, db: asyncpg.Connection) -> None:
         try:
             migration.load()
             if not migration.applied:
-                logger.warning("Applying %s", migration.id)
+                context.warning("Applying %s", migration.id)
                 async with transaction(db, migration):
                     await migration.apply(db)
                     await sql.migration_applied(db, migration.id, migration.hash)
@@ -51,7 +49,7 @@ async def apply(config: Config, db: asyncpg.Connection) -> None:
             raise exceptions.BadMigrationError(msg) from e
 
 
-async def rollback(config: Config, db: asyncpg.Connection, count: int | None = None) -> None:
+async def rollback(context: Context, config: Config, db: asyncpg.Connection, count: int | None = None) -> None:
     await sql.ensure_pogo_sync(db)
     migrations = await sql.read_migrations(config.migrations, db)
     migrations = reversed(list(topological_sort([m.load() for m in migrations])))
@@ -61,7 +59,7 @@ async def rollback(config: Config, db: asyncpg.Connection, count: int | None = N
         try:
             migration.load()
             if migration.applied and (count is None or i < count):
-                logger.warning("Rolling back %s", migration.id)
+                context.warning("Rolling back %s", migration.id)
 
                 async with transaction(db, migration):
                     await migration.rollback(db)

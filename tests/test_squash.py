@@ -6,7 +6,7 @@ import pytest
 from pogo_migrate import migration, squash
 
 
-def test_remove_no_dependent(migration_file_factory):
+def test_remove_no_dependent(migration_file_factory, context):
     mp = migration_file_factory(
         "20210101_01_rando-commit",
         "sql",
@@ -22,12 +22,12 @@ def test_remove_no_dependent(migration_file_factory):
     m = migration.Migration(mp.stem, mp, None)
     m.load()
 
-    squash.remove(m, None)
+    squash.remove(context, m, None)
 
     assert mp.exists() is False
 
 
-def test_remove_with_backup(migration_file_factory):
+def test_remove_with_backup(migration_file_factory, context):
     mp = migration_file_factory(
         "20210101_01_rando-commit",
         "sql",
@@ -43,13 +43,13 @@ def test_remove_with_backup(migration_file_factory):
     m = migration.Migration(mp.stem, mp, None)
     m.load()
 
-    squash.remove(m, None, backup=True)
+    squash.remove(context, m, None, backup=True)
 
     assert mp.exists() is False
     assert Path(f"{mp}.bak").exists() is True
 
 
-def test_remove_no_parent_with_dependent(migration_file_factory):
+def test_remove_no_parent_with_dependent(migration_file_factory, context):
     mp = migration_file_factory(
         "20210101_01_rando-commit",
         "sql",
@@ -79,12 +79,12 @@ def test_remove_no_parent_with_dependent(migration_file_factory):
     m.load()
     m2.load()
 
-    squash.remove(m, m2)
+    squash.remove(context, m, m2)
 
     assert m2.depends == set()
 
 
-def test_remove_python_no_parent_with_dependent(migration_file_factory):
+def test_remove_python_no_parent_with_dependent(migration_file_factory, context):
     mp = migration_file_factory(
         "20210101_01_rando-migration-message",
         "py",
@@ -130,12 +130,12 @@ def test_remove_python_no_parent_with_dependent(migration_file_factory):
     m.load()
     m2.load()
 
-    squash.remove(m, m2)
+    squash.remove(context, m, m2)
 
     assert m2.depends == set()
 
 
-def test_remove_with_parent_with_dependent(migration_file_factory):
+def test_remove_with_parent_with_dependent(migration_file_factory, context):
     mp = migration_file_factory(
         "20210101_01_rando-commit",
         "sql",
@@ -178,7 +178,7 @@ def test_remove_with_parent_with_dependent(migration_file_factory):
     m2.load()
     m3.load()
 
-    squash.remove(m2, m3)
+    squash.remove(context, m2, m3)
 
     assert m3.depends == {m}
 
@@ -511,8 +511,8 @@ def test_rollback_data_statements_first_reversed_from_discovery_order(migration_
         ("DELETE FROM TABLE tbl WHERE id = 1", "DELETE"),
     ],
 )
-def test_parse_sqlglot_type(statement, expected_type):
-    parsed = squash.parse_sqlglot(statement)
+def test_parse_sqlglot_type(statement, expected_type, context):
+    parsed = squash.parse_sqlglot(context, statement)
 
     assert parsed.statement_type == expected_type
 
@@ -550,8 +550,8 @@ def test_parse_sqlglot_type(statement, expected_type):
         ("DELETE FROM TABLE tbl WHERE id = 1", None),
     ],
 )
-def test_parse_sqlglot_identifier(statement, expected_identifier):
-    parsed = squash.parse_sqlglot(statement)
+def test_parse_sqlglot_identifier(statement, expected_identifier, context):
+    parsed = squash.parse_sqlglot(context, statement)
 
     assert parsed.identifier == expected_identifier
 
@@ -564,10 +564,10 @@ def test_parse_sqlglot_identifier(statement, expected_identifier):
         ("DROP TABLE lock;"),
     ],
 )
-def test_parse_sqlglot_identifier_aborts_at_table_keyword(statement):
+def test_parse_sqlglot_identifier_aborts_at_table_keyword(statement, context):
     # Original code would pick up column identifier.
     with pytest.raises(squash.ParseError, match="Expected table name but got lock."):
-        squash.parse_sqlglot(statement)
+        squash.parse_sqlglot(context, statement)
 
 
 @pytest.mark.parametrize(
@@ -603,7 +603,7 @@ def test_parse_sqlglot_identifier_aborts_at_table_keyword(statement):
         ("DELETE FROM TABLE tbl WHERE id = 1", None),
     ],
 )
-def test_parse_identifier(statement, expected_identifier):
-    parsed = squash.parse(statement)
+def test_parse_identifier(statement, expected_identifier, context):
+    parsed = squash.parse(context, statement)
 
     assert parsed.identifier == expected_identifier

@@ -12,6 +12,7 @@ import typer.testing
 
 import pogo_migrate.cli
 from pogo_migrate import sql
+from pogo_migrate.context import Context
 from pogo_migrate.migration import Migration
 
 
@@ -104,6 +105,11 @@ async def db_session(postgres_dsn):
         yield conn
     finally:
         await tr.rollback()
+
+
+@pytest.fixture()
+def context():
+    return Context(0)
 
 
 class CliRunner(typer.testing.CliRunner):
