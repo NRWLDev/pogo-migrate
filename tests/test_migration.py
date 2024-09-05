@@ -140,6 +140,7 @@ class TestReadSqlMigration:
                 name VARCHAR(100) NOT NULL,
                 CONSTRAINT uc_name UNIQUE (name)
             );
+            -- final comment
             """),
         )
         _, _, _, rollback, _, _, rollback_statements = migration.read_sql_migration(mp)
@@ -153,6 +154,7 @@ class TestReadSqlMigration:
                 name VARCHAR(100) NOT NULL,
                 CONSTRAINT uc_name UNIQUE (name)
             );"""),
+            "-- final comment;",
         ]
         db = mock.Mock(execute=AsyncMock())
         await rollback(db)
@@ -412,7 +414,7 @@ class TestMigration:
 
         assert (
             str(e.value)
-            == "Could not import migration from '20210101_01_rando-migration-message.csv': ModuleSpec has no loader attached"  # noqa: E501
+            == "Could not import migration from '20210101_01_rando-migration-message.csv': ModuleSpec has no loader attached"
         )
 
     def test_load_invalid_dependency(self, migration_file_factory):

@@ -588,7 +588,13 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
 
         _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
         for i, apply in enumerate(apply_statements):
-            parsed = squash.parse(apply)
+            try:
+                parsed = squash.parse_sqlglot(apply)
+            except squash.ParseError as e:
+                logger.error("%s: %s", migration.id, str(e))
+                logger.warning(apply)
+                raise typer.Exit(code=1) from e
+
             if source:
                 parsed.statement = f"{parsed.statement} -- source: {migration.id}"
 
@@ -617,7 +623,12 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
 
         rollbacks_ = defaultdict(list)
         for rollback in reversed(rollback_statements):
-            parsed = squash.parse(rollback)
+            try:
+                parsed = squash.parse_sqlglot(rollback)
+            except squash.ParseError as e:
+                logger.error("%s: %s", migration.id, str(e))
+                logger.warning(rollback)
+                raise typer.Exit(code=1) from e
             if source:
                 parsed.statement = f"{parsed.statement} -- source: {migration.id}"
 
