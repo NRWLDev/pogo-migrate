@@ -684,6 +684,46 @@ def clean(
             path.unlink()
 
 
+@app.command("validate")
+def validate(
+    migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
+    *,
+    verbose: int = typer.Option(
+        0,
+        "-v",
+        "--verbose",
+        help="Verbose output. Use multiple times to increase level of verbosity.",
+        count=True,
+        max=3,
+    ),
+) -> None:
+    """Validate migrations [EXPERIMENTAL].
+
+    Best effort pass through to make sure identifiers aren't keywords.
+    """
+    setup_logging(verbose)
+    migrations = [
+        Migration(path.stem, path, []) for path in Path(migrations_location).iterdir() if path.suffix in {".py", ".sql"}
+    ]
+    migrations = topological_sort([m.load() for m in migrations])
+
+    for migration in migrations:
+        if not migration.is_sql:
+            logger.warning("Can't validate python migration %s, skipping...", migration.id)
+            continue
+
+        _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
+        for statement in apply_statements + rollback_statements:
+            parsed = squash.parse(statement)
+
+            if parsed.statement_type in ("CREATE", "ALTER", "DROP") and parsed.identifier is None:
+                logger.error(
+                    "Can not extract table from DDL statement in migration %s, check that table name is not a reserved word.",
+                    migration.id,
+                )
+                logger.warning(statement)
+
+
 @app.command("mark")
 def mark(
     database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
