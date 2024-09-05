@@ -715,6 +715,7 @@ def validate(
             mock_asyncpg.execute = mock.AsyncMock(return_value=None)
             mock_asyncpg.fetch = mock.AsyncMock(return_value=[mock.MagicMock()])
             mock_asyncpg.fetchrow = mock.AsyncMock(return_value=mock.MagicMock())
+            mock_asyncpg.fetchval = mock.AsyncMock(return_value=mock.MagicMock())
             try:
                 asyncio.run(migration.apply(mock_asyncpg))
             except Exception:  # noqa: BLE001
@@ -728,6 +729,7 @@ def validate(
             statements = [c[1].get("query") or c[0][0] for c in mock_asyncpg.execute.call_args_list]
             statements += [c[1].get("query") or c[0][0] for c in mock_asyncpg.fetch.call_args_list]
             statements += [c[1].get("query") or c[0][0] for c in mock_asyncpg.fetchrow.call_args_list]
+            statements += [c[1].get("query") or c[0][0] for c in mock_asyncpg.fetchval.call_args_list]
         else:
             _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
             statements = apply_statements + rollback_statements
