@@ -140,6 +140,7 @@ class TestReadSqlMigration:
                 name VARCHAR(100) NOT NULL,
                 CONSTRAINT uc_name UNIQUE (name)
             );
+            -- final comment
             """),
         )
         _, _, _, rollback, _, _, rollback_statements = migration.read_sql_migration(mp)
@@ -153,6 +154,7 @@ class TestReadSqlMigration:
                 name VARCHAR(100) NOT NULL,
                 CONSTRAINT uc_name UNIQUE (name)
             );"""),
+            "-- final comment;",
         ]
         db = mock.Mock(execute=AsyncMock())
         await rollback(db)
