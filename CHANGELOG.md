@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.1.0 (released 2024-09-06)
+
+### Features and Improvements
+
+- Add validate command to check for unquoted reserved keywords etc. [[16](https://github.com/NRWLDev/pogo-migrate/issues/16)] [[159d50a](https://github.com/NRWLDev/pogo-migrate/commit/159d50a46bbc2b0a84e72628c8038213b6d22371)]
+- Use sqlglot as the default parsing library, fall back to sqlparse for aggregations. [[17](https://github.com/NRWLDev/pogo-migrate/issues/17)] [[1e6d5d3](https://github.com/NRWLDev/pogo-migrate/commit/1e6d5d3225d9a1dc62cc6e04127b33a51e32d3b6)]
+- Use unittest.AsyncMock to extract statements from python migrations for validation. [[20](https://github.com/NRWLDev/pogo-migrate/issues/20)] [[d16643f](https://github.com/NRWLDev/pogo-migrate/commit/d16643f5390e77252f1ed42814ea4813b8b98351)]
+- Implement custom messaging object to avoid using logging module. [[26](https://github.com/NRWLDev/pogo-migrate/issues/26)] [[0874318](https://github.com/NRWLDev/pogo-migrate/commit/0874318251fd8f607bae9cdb2d9ecbee41d757af)]
+
+### Documentation
+
+- Expand usage documentation to all commands, including new experimental commands [[22](https://github.com/NRWLDev/pogo-migrate/issues/22)] [[cd248e5](https://github.com/NRWLDev/pogo-migrate/commit/cd248e51bf8b953b601e4c1f09bc1226bf759d45)]
+
+### Miscellaneous
+
+- Update changelog-gen and related configuration. [[87457a6](https://github.com/NRWLDev/pogo-migrate/commit/87457a67be6ae5b1ab9a10be39d439fc30083026)]
+
 ## v0.0.22 (released 2024-08-07)
 
 ### Features and Improvements
