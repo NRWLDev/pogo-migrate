@@ -695,11 +695,13 @@ def validate(
             try:
                 asyncio.run(migration.apply(mock_asyncpg))
             except Exception:  # noqa: BLE001
+                context.stacktrace()
                 context.warning("Can't validate python migration %s (apply), skipping...", migration.id)
 
             try:
                 asyncio.run(migration.rollback(mock_asyncpg))
             except Exception:  # noqa: BLE001
+                context.stacktrace()
                 context.warning("Can't validate python migration %s (rollback), skipping...", migration.id)
 
             statements = [c[1].get("query") or c[0][0] for c in mock_asyncpg.execute.call_args_list]

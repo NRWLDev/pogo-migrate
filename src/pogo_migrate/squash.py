@@ -138,9 +138,8 @@ def parse(context: Context, statement: str) -> ParsedStatement:
             Fetch tbl_ident from CREATE INDEX statements.
             Fetch ident from DROP INDEX statements.
 
-            CREATE [UNIQUE] INDEX [IF NOT EXISTS] ident ON tbl_ident;
-            CREATE [UNIQUE] INDEX CONCURRENTLY [IF NOT EXISTS] ident ON tbl_ident;
-            DROP INDEX CONCURRENTLY [IF EXISTS] ident;
+            CREATE [UNIQUE] INDEX [CONCURRENTLY] [IF NOT EXISTS] ident ON tbl_ident;
+            DROP INDEX [CONCURRENTLY] [IF EXISTS] ident;
             """
             c_idx, _c_keyword = parsed.token_next_by(idx=exists_idx or idx, m=(sqlparse.tokens.Keyword, "CONCURRENTLY"))
             on_idx, _on_keyword = parsed.token_next_by(
@@ -162,7 +161,7 @@ def parse(context: Context, statement: str) -> ParsedStatement:
                 else None
             )
 
-    context.debug(parsed.tokens)
+    context.debug("parsed tokens: %s", parsed.tokens)
 
     return ParsedStatement(statement, type_, identifier)
 
