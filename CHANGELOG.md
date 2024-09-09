@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.1 (released 2024-09-09)
+
+### Miscellaneous
+
+- Migrate from poetry to uv for dependency and build management [[e94e595](https://github.com/NRWLDev/pogo-migrate/commit/e94e59573c0b3d4e7ec7da03bde55053dd687239)]
+
 ## v0.1.0 (released 2024-09-06)
 
 ### Features and Improvements
