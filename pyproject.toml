@@ -1,17 +1,18 @@
-[tool.poetry]
+[project]
 name = "pogo-migrate"
 version = "0.1.0"
 description = "Database migration tool for asyncpg"
 readme = "README.md"
 homepage = "https://github.com/NRWLDev/pogo-migrate"
 authors = [
-    "Daniel Edgecombe <daniel@nrwl.co>"
+    {name = "Daniel Edgecombe", email = "daniel@nrwl.co"},
 ]
 maintainers = [
-    "Daniel Edgecombe <daniel@nrwl.co>",
+    {name = "Daniel Edgecombe", email = "daniel@nrwl.co"},
 ]
+license = "Apache-2.0"
+requires-python = ">=3.8"
 keywords = ["migrations", "migrate", "database", "asyncpg", "yoyo"]
-license = "Apache"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -20,36 +21,46 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Database",
     "Topic :: Software Development",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3",
 ]
 
-[tool.poetry.dependencies]
-python = "^3.9"
+dependencies = [
+    "typer-slim >= 0",
+    "rtoml >= 0.10",
+    "sqlparse >= 0",
+    "tabulate >= 0.9.0",
+    "python-dotenv >= 1.0.0",
+    "typing_extensions >= 4.7.0; python_version <= '3.10'",
+    "sqlglot >= 25.19",
+]
 
-typer-slim = "^0"
-rtoml = ">=0.10"
-sqlparse = "^0"
-tabulate = "^0.9.0"
-python-dotenv = "^1.0.0"
-typing_extensions = { version = "^4.7.0", python = "<3.10" }
-sqlglot = "^25.19"
+[project.optional-dependencies]
+dev = [
+    # Tests
+    "asyncpg >= 0.29.0",
+    "pytest-asyncio >= 0.23.5",
+    "nest-asyncio >= 1.6.0",
+    "pytest >= 8.0.2",
+    "pytest-random-order >= 1.1.1",
+    "pytest-cov >= 4.1.0",
+    "pytest-env >= 0.8.1",
 
-[tool.poetry.group.dev.dependencies]
-# Tests
-asyncpg = "^0.29.0"
-pytest = "^8.0.2"
-pytest-random-order = "^1.1.1"
-pytest-cov = "^4.1.0"
-pytest-env = "^0.8.1"
+    # Style
+    "ruff >= 0.6.4",
+    "pre-commit >= 3.0.2",
 
-# Style
-ruff = "^0.3.0"
-pre-commit = "^3.0.2"
+    # release
+    "changelog-gen >= 0.12",
+]
 
-# Release management
-changelog-gen = "^0.12"
-pytest-asyncio = "^0.23.5"
-nest-asyncio = "^1.6.0"
+[project.scripts]
+pogo = "pogo_migrate.cli:app"
 
 [tool.changelog_gen]
 current_version = "0.1.0"
@@ -139,9 +150,6 @@ known-first-party = ["pogo_migrate"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.poetry.scripts]
-pogo = "pogo_migrate.cli:app"
-
 [build-system]
-requires = ["poetry-core>=1.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
