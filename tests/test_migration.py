@@ -64,7 +64,7 @@ class TestReadSqlMigration:
             "sql",
             dedent("""
             -- migration message
-            -- depends: 20200101_01_rando-intial-commit
+            -- depends: 20200101_01_rando-initial-commit
 
             -- migrate: apply
             CREATE TABLE table_one();
