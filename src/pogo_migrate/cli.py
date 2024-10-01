@@ -277,7 +277,7 @@ def new(
     message_: str = typer.Option("", "-m", "--message", help="Message describing focus of the migration."),
     *,
     interactive: bool = typer.Option(True, help="Open migration for editing."),  # noqa: FBT003
-    sql_: bool = typer.Option(False, "--sql", help="Generate a sql migration."),  # noqa: FBT003
+    py_: bool = typer.Option(False, "--py", help="Generate a python migration."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -299,13 +299,13 @@ def new(
         migrations = await sql.read_migrations(config.migrations, db=None)
         migrations = topological_sort([m.load() for m in migrations])
 
-        template = migration_sql_template if sql_ else migration_template
+        template = migration_sql_template if not py_ else migration_template
         depends = migrations[-1].id if migrations else ""
-        depends = f" {depends}" if sql_ and depends else ([depends] if depends else depends)
-        depends = f'''"{'", "'.join(depends)}"''' if not sql_ and depends else depends
-        message = f" {message_}" if sql_ and message_ else message_
+        depends = f" {depends}" if not py_ and depends else ([depends] if depends else depends)
+        depends = f'''"{'", "'.join(depends)}"''' if py_ and depends else depends
+        message = f" {message_}" if not py_ and message_ else message_
         content = template.format(message=message, depends=depends)
-        extension = ".sql" if sql_ else ".py"
+        extension = ".sql" if not py_ else ".py"
 
         if not interactive:
             fp = make_file(config, message, extension)
