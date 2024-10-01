@@ -39,7 +39,7 @@ file and open the file in your configured text editor (`vi` by default).
 
 Supported flags:
 
-- `--sql` generate a sql migration (defaults to `.py`)
+- `--py` generate a python migration (defaults to `.sql`)
 - `--no-interactive` skip the editor step and just write the migration template
   to the migrations directory.
 

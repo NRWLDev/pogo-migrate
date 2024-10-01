@@ -155,7 +155,7 @@ class TestNew:
     def test_non_interactive_file_written(self, monkeypatch, cli_runner, cwd):
         monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
 
-        result = cli_runner.invoke(["new", "--sql", "--no-interactive"])
+        result = cli_runner.invoke(["new", "--no-interactive"])
 
         assert result.exit_code == 0, result.output
         with (cwd / "new_file.py").open() as f:
@@ -193,7 +193,7 @@ class TestNew:
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
 
-        result = cli_runner.invoke(["new", "--sql", "-v"])
+        result = cli_runner.invoke(["new", "-v"])
 
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
@@ -213,7 +213,7 @@ class TestNew:
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli, "NamedTemporaryFile", mock.Mock(return_value=mock_file))
 
-        cli_runner.invoke(["new"])
+        cli_runner.invoke(["new", "--py"])
 
         assert cli.subprocess.call.call_args == mock.call(["vim", str(f)])
 
@@ -228,7 +228,7 @@ class TestNew:
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli, "NamedTemporaryFile", mock.Mock(return_value=mock_file))
 
-        cli_runner.invoke(["new"])
+        cli_runner.invoke(["new", "--py"])
 
         assert cli.subprocess.call.call_args == mock.call(["vim", str(f)])
 
@@ -238,7 +238,7 @@ class TestNew:
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
 
-        result = cli_runner.invoke(["new", "--sql"])
+        result = cli_runner.invoke(["new"])
 
         assert result.exit_code == 0, result.output
         with (cwd / "new_file.py").open() as f:
