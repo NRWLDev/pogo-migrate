@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.0 (released 2024-10-01)
+
+### Features and Improvements
+
+- **Breaking** Default to sql migrations with optin for python [[31](https://github.com/NRWLDev/pogo-migrate/issues/31)] [[25a7445](https://github.com/NRWLDev/pogo-migrate/commit/25a7445564138ab83a98a9a6392039551cb8dbf5)]
+
+### Miscellaneous
+
+- Update pre-commit ruff and apply fixes. [[54e2521](https://github.com/NRWLDev/pogo-migrate/commit/54e2521d2a40126eccb4d26c499aa82617998b07)]
+
 ## v0.1.1 (released 2024-09-09)
 
 ### Miscellaneous
