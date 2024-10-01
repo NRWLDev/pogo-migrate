@@ -93,7 +93,7 @@ def handle_exceptions(context: Context) -> t.Callable[t.Callable[P, t.Awaitable[
                 return await f(*args, **kwargs)
             except typer.Exit:
                 raise
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 context.stacktrace()
                 context.error(str(e))
                 raise typer.Exit(code=1) from e
@@ -124,12 +124,12 @@ def init(
     context = Context(verbose)
 
     @handle_exceptions(context)
-    async def init_() -> None:
+    def init_() -> None:
         pyproject = Path("pyproject.toml")
         if not pyproject.exists():
             pyproject.touch()
 
-        with pyproject.open() as f:  # noqa: ASYNC101
+        with pyproject.open() as f:
             data = rtoml.load(f)
 
         if "tool" in data and "pogo" in data["tool"]:
@@ -159,11 +159,11 @@ def init(
         context.error(config)
         if typer.confirm(f"Write configuration to {pyproject.absolute()}"):
             loc.mkdir(exist_ok=True, parents=True)
-            with pyproject.open("a") as f:  # noqa: ASYNC101
+            with pyproject.open("a") as f:
                 f.write("\n")
                 f.write(config)
 
-    asyncio.run(init_())
+    init_()
 
 
 migration_template = dedent(

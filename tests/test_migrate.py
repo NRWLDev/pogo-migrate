@@ -4,17 +4,17 @@ import pogo_migrate.config
 from pogo_migrate import exceptions, migrate
 
 
-@pytest.fixture()
+@pytest.fixture
 def pyproject(pyproject_factory):
     return pyproject_factory()
 
 
-@pytest.fixture()
+@pytest.fixture
 def config(pyproject):  # noqa: ARG001
     return pogo_migrate.config.load_config()
 
 
-@pytest.fixture()
+@pytest.fixture
 def _migration_one(migrations):
     p = migrations / "20240317_01_abcde-initial-migration.sql"
 
@@ -31,7 +31,7 @@ DROP TABLE table_one;
 """)
 
 
-@pytest.fixture()
+@pytest.fixture
 def _migration_two(migrations, _migration_one):
     p = migrations / "20240317_02_12345-second-migration.sql"
 
@@ -54,7 +54,7 @@ DROP TABLE table_two;
 """)
 
 
-@pytest.fixture()
+@pytest.fixture
 def _broken_apply(migrations, _migration_two):
     p = migrations / "20240318_01_12345-broken-apply.sql"
 
@@ -71,7 +71,7 @@ DROP TABLE table_two;
 """)
 
 
-@pytest.fixture()
+@pytest.fixture
 def _broken_rollback(migrations, _migration_two):
     p = migrations / "20240318_01_12345-broken-rollback.sql"
 

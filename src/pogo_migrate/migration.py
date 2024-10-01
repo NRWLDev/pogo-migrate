@@ -144,7 +144,7 @@ class Migration:
             if spec and spec.loader:
                 try:
                     spec.loader.exec_module(module)
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:
                     msg = f"Could not import migration from '{self.path.name}'"
                     raise exceptions.BadMigrationError(msg) from e
                 self._doc = module.__doc__.strip()

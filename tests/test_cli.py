@@ -17,7 +17,7 @@ def test_version(cli_runner):
     cli_runner.assert_output(f"pogo-migrate {version}")
 
 
-@pytest.fixture()
+@pytest.fixture
 def pyproject(pyproject_factory, migrations):  # noqa: ARG001
     return pyproject_factory()
 

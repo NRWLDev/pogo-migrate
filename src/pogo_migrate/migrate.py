@@ -44,7 +44,7 @@ async def apply(context: Context, config: Config, db: asyncpg.Connection) -> Non
                 async with transaction(db, migration):
                     await migration.apply(db)
                     await sql.migration_applied(db, migration.id, migration.hash)
-        except Exception as e:  # noqa: BLE001, PERF203
+        except Exception as e:  # noqa: PERF203
             msg = f"Failed to apply {migration.id}"
             raise exceptions.BadMigrationError(msg) from e
 
@@ -65,6 +65,6 @@ async def rollback(context: Context, config: Config, db: asyncpg.Connection, cou
                     await migration.rollback(db)
                     await sql.migration_unapplied(db, migration.id)
                     i += 1
-        except Exception as e:  # noqa: BLE001, PERF203
+        except Exception as e:  # noqa: PERF203
             msg = f"Failed to rollback {migration.id}"
             raise exceptions.BadMigrationError(msg) from e

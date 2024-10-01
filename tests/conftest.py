@@ -37,7 +37,7 @@ def _clear_migration_tracking():
         Migration._Migration__migrations = {}
 
 
-@pytest.fixture()
+@pytest.fixture
 def postgres_dsn():
     return os.environ["POSTGRES_DSN"]
 
@@ -53,7 +53,7 @@ def cwd(tmp_path):
         os.chdir(orig)
 
 
-@pytest.fixture()
+@pytest.fixture
 def pyproject_factory(cwd):
     def factory():
         p = cwd / "pyproject.toml"
@@ -75,7 +75,7 @@ def pyproject_factory(cwd):
     return factory
 
 
-@pytest.fixture()
+@pytest.fixture
 def migrations(cwd):
     p = cwd / "migrations"
     p.mkdir()
@@ -83,7 +83,7 @@ def migrations(cwd):
     return p
 
 
-@pytest.fixture()
+@pytest.fixture
 def migration_file_factory(migrations):
     def factory(mig_id, format_, contents):
         p = migrations / f"{mig_id}.{format_}"
@@ -107,7 +107,7 @@ async def db_session(postgres_dsn):
         await tr.rollback()
 
 
-@pytest.fixture()
+@pytest.fixture
 def context():
     return Context(0)
 
@@ -136,6 +136,6 @@ class CliRunner(typer.testing.CliRunner):
         assert self._clean_output(self.result.output) == self._clean_output(expected)
 
 
-@pytest.fixture()
+@pytest.fixture
 def cli_runner():
     return CliRunner()

@@ -8,12 +8,12 @@ import pogo_migrate.config
 from pogo_migrate import util
 
 
-@pytest.fixture()
+@pytest.fixture
 def pyproject(pyproject_factory):
     return pyproject_factory()
 
 
-@pytest.fixture()
+@pytest.fixture
 def config(pyproject):  # noqa: ARG001
     return pogo_migrate.config.load_config()
 
