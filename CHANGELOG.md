@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.1 (released 2024-10-02)
+
+### Bug fixes
+
+- CLI internals need to be async, revert invalid previous fix. [[aa34f1f](https://github.com/NRWLDev/pogo-migrate/commit/aa34f1f648c32e07505c28472e285d3b8760dc93)]
+
 ## v0.2.0 (released 2024-10-01)
 
 ### Features and Improvements
