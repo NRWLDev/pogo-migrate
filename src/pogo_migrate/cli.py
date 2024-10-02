@@ -124,12 +124,12 @@ def init(
     context = Context(verbose)
 
     @handle_exceptions(context)
-    def init_() -> None:
+    async def init_() -> None:
         pyproject = Path("pyproject.toml")
         if not pyproject.exists():
             pyproject.touch()
 
-        with pyproject.open() as f:
+        with pyproject.open() as f:  # noqa: ASYNC230
             data = rtoml.load(f)
 
         if "tool" in data and "pogo" in data["tool"]:
@@ -159,11 +159,11 @@ def init(
         context.error(config)
         if typer.confirm(f"Write configuration to {pyproject.absolute()}"):
             loc.mkdir(exist_ok=True, parents=True)
-            with pyproject.open("a") as f:
+            with pyproject.open("a") as f:  # noqa: ASYNC230
                 f.write("\n")
                 f.write(config)
 
-    init_()
+    asyncio.run(init_())
 
 
 migration_template = dedent(
