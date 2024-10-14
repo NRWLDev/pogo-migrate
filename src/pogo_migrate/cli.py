@@ -123,7 +123,7 @@ def init(
     """
     context = Context(verbose)
 
-    @handle_exceptions(context)
+    @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def init_() -> None:
         pyproject = Path("pyproject.toml")
         if not pyproject.exists():
@@ -238,7 +238,7 @@ def create_with_editor(config: Config, content: str, extension: str, context: Co
             editor.append(tmpfile.name)
 
         mtime = Path(tmpfile.name).lstat().st_mtime
-        sys.path.insert(0, config.migrations)
+        sys.path.insert(0, str(config.migrations))
         while True:
             try:
                 subprocess.call(editor)  # noqa: S603
@@ -290,7 +290,7 @@ def new(
     """Generate a new migration."""
     context = Context(verbose)
 
-    @handle_exceptions(context)
+    @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def new_() -> None:
         if dotenv:  # pragma: no cover
             load_dotenv()
@@ -342,7 +342,7 @@ def history(
 
     context = Context(verbose)
 
-    @handle_exceptions(context)
+    @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def history_() -> None:
         if dotenv:  # pragma: no cover
             load_dotenv()
@@ -395,7 +395,7 @@ def apply(
     """Apply migrations."""
     context = Context(verbose)
 
-    @handle_exceptions(context)
+    @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def apply_() -> None:
         if dotenv:  # pragma: no cover
             load_dotenv()
@@ -432,7 +432,7 @@ def rollback(
     """Rollback one or more migrations."""
     context = Context(verbose)
 
-    @handle_exceptions(context)
+    @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def rollback_() -> None:
         if dotenv:  # pragma: no cover
             load_dotenv()
@@ -465,7 +465,9 @@ def remove(
     context = Context(verbose)
 
     migrations = [
-        Migration(path.stem, path, []) for path in Path(migrations_location).iterdir() if path.suffix in {".py", ".sql"}
+        Migration(path.stem, path, set())
+        for path in Path(migrations_location).iterdir()
+        if path.suffix in {".py", ".sql"}
     ]
     migrations = topological_sort([m.load() for m in migrations])
     for i, migration in enumerate(migrations):
@@ -511,7 +513,9 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
     context = Context(verbose)
 
     migrations = [
-        Migration(path.stem, path, []) for path in Path(migrations_location).iterdir() if path.suffix in {".py", ".sql"}
+        Migration(path.stem, path, set())
+        for path in Path(migrations_location).iterdir()
+        if path.suffix in {".py", ".sql"}
     ]
     migrations = topological_sort([m.load() for m in migrations])
 
@@ -540,7 +544,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                     latest = migration
                     continue
 
-            if applies or rollbacks:
+            if (applies or rollbacks) and latest:
                 new = squash.write(applies, rollbacks, latest, depends, squashed)
                 replaced[latest.id]["new"] = new
                 if new is None:
@@ -620,7 +624,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         for ident, statements in rollbacks_.items():
             rollbacks[ident].append(statements)
 
-    if applies or rollbacks:
+    if (applies or rollbacks) and latest:
         new = squash.write(applies, rollbacks, latest, depends, squashed)
         replaced[latest.id]["new"] = new
         if new is None:
@@ -679,7 +683,9 @@ def validate(
     context = Context(verbose)
 
     migrations = [
-        Migration(path.stem, path, []) for path in Path(migrations_location).iterdir() if path.suffix in {".py", ".sql"}
+        Migration(path.stem, path, set())
+        for path in Path(migrations_location).iterdir()
+        if path.suffix in {".py", ".sql"}
     ]
     migrations = topological_sort([m.load() for m in migrations])
 
@@ -747,7 +753,7 @@ def mark(
     """Mark a migration as applied, without running."""
     context = Context(verbose)
 
-    @handle_exceptions(context)
+    @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def _mark() -> None:
         if dotenv:  # pragma: no cover
             load_dotenv()
@@ -788,7 +794,7 @@ def unmark(
     """Mark a migration as unapplied, without rolling back."""
     context = Context(verbose)
 
-    @handle_exceptions(context)
+    @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def _unmark() -> None:
         if dotenv:  # pragma: no cover
             load_dotenv()
@@ -830,7 +836,7 @@ def migrate_yoyo(
     """Migrate existing 'yoyo' migrations to 'pogo'."""
     context = Context(verbose)
 
-    @handle_exceptions(context)
+    @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def _migrate() -> None:
         if dotenv:  # pragma: no cover
             load_dotenv()

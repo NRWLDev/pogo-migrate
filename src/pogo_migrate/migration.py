@@ -5,6 +5,7 @@ import importlib.util
 import re
 import typing as t
 
+import asyncpg
 import sqlparse
 
 from pogo_migrate import exceptions, topologicalsort
@@ -12,7 +13,8 @@ from pogo_migrate import exceptions, topologicalsort
 if t.TYPE_CHECKING:
     from pathlib import Path
 
-    import asyncpg
+
+MigrationFunc = t.Callable[[asyncpg.Connection], t.Coroutine[t.Any, t.Any, t.Any]]
 
 
 def strip_comments(statement: str) -> str:
@@ -30,15 +32,7 @@ def terminate_statements(statements: list[str]) -> list[str]:
 
 def read_sql_migration(
     path: Path,
-) -> tuple[
-    str,
-    str,
-    t.Callable[[asyncpg.Connection], t.Coroutine[t.Any, t.Any, t.Any]],
-    t.Callable[[asyncpg.Connection], t.Coroutine[t.Any, t.Any, t.Any]],
-    bool,
-    list[str],
-    list[str],
-]:
+) -> tuple[str, str, MigrationFunc, MigrationFunc, bool, list[str], list[str]]:
     """Read a sql migration.
 
     Parse the message, [depends], apply statements, and rollback statements.
@@ -95,12 +89,12 @@ class Migration:
         applied_migrations = applied_migrations or set()
         self.id = mig_id
         self.path = path
-        self.hash: str | None = hashlib.sha256(mig_id.encode("utf-8")).hexdigest() if mig_id else None
+        self.hash: str = hashlib.sha256(mig_id.encode("utf-8")).hexdigest()
         self._use_transaction: bool = True
         self._doc: str | None = None
         self._depends: set[Migration] | None = None
-        self._apply: t.Awaitable | None = None
-        self._rollback: t.Awaitable | None = None
+        self._apply: MigrationFunc | None = None
+        self._rollback: MigrationFunc | None = None
         self._applied = self.id in applied_migrations
         self.__migrations[self.id] = self
 
@@ -128,9 +122,13 @@ class Migration:
         return self.path.suffix == ".sql"
 
     async def apply(self: t.Self, db: asyncpg.Connection) -> None:
+        if self._apply is None:
+            return
         await self._apply(db)
 
     async def rollback(self: t.Self, db: asyncpg.Connection) -> None:
+        if self._rollback is None:
+            return
         await self._rollback(db)
 
     def load(self: t.Self) -> Migration:
@@ -151,34 +149,36 @@ class Migration:
             if spec:
                 module = importlib.util.module_from_spec(spec)
 
-            if spec and spec.loader:
-                try:
-                    spec.loader.exec_module(module)
-                except Exception as e:
-                    msg = f"Could not import migration from '{self.path.name}'"
-                    raise exceptions.BadMigrationError(msg) from e
-                self._doc = module.__doc__.strip()
-                depends_ = module.__depends__
-                self._apply = module.apply
-                self._rollback = module.rollback
-                self._use_transaction = getattr(module, "__transaction__", True)
+                if spec.loader:
+                    try:
+                        spec.loader.exec_module(module)
+                    except Exception as e:
+                        msg = f"Could not import migration from '{self.path.name}'"
+                        raise exceptions.BadMigrationError(msg) from e
+                    self._doc = (module.__doc__ or "").strip()
+                    depends_ = module.__depends__
+                    self._apply = module.apply
+                    self._rollback = module.rollback
+                    self._use_transaction = getattr(module, "__transaction__", True)
             else:
                 msg = f"Could not import migration from '{self.path.name}': ModuleSpec has no loader attached"
                 raise exceptions.BadMigrationError(msg)
 
-        self._depends = {self.__migrations.get(mig_id) for mig_id in depends_}
-        if None in self._depends:
+        found_dependencies = {self.__migrations.get(mig_id) for mig_id in depends_}
+        if None in found_dependencies:
             msg = f"Could not resolve dependencies for '{self.path.name}'"
             raise exceptions.BadMigrationError(msg)
+
+        self._depends = {d for d in found_dependencies if d is not None}
 
         return self
 
     @property
     def __doc__(self: t.Self) -> str:
-        return self._doc
+        return self._doc or ""
 
 
-def topological_sort(migrations: t.Iterable[Migration]) -> t.Iterable[Migration]:
+def topological_sort(migrations: t.Iterable[Migration]) -> list[Migration]:
     migration_list = list(migrations)
     all_migrations = set(migration_list)
     dependency_graph = {m: (m.depends & all_migrations) for m in migration_list}

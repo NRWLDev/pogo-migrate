@@ -14,7 +14,7 @@ if t.TYPE_CHECKING:
 
 
 @contextlib.asynccontextmanager
-async def transaction(db: asyncpg.Connection, migration: Migration) -> None:
+async def transaction(db: asyncpg.Connection, migration: Migration) -> t.AsyncIterator[None]:
     tr = None
     if migration.use_transaction:
         tr = db.transaction()

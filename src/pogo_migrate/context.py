@@ -8,11 +8,6 @@ import typing as t
 from dataclasses import dataclass, field
 from enum import IntEnum
 
-if sys.version_info < (3, 10):
-    from typing_extensions import ParamSpec
-else:  # pragma: no cover
-    from typing import ParamSpec
-
 import click
 
 
@@ -24,8 +19,6 @@ class Verbosity(IntEnum):
     verbose2 = 2
     verbose3 = 3
 
-
-P = ParamSpec("P")
 
 VERBOSITY = {
     0: logging.ERROR,
@@ -60,26 +53,26 @@ class Context:
     def __post_init__(self: t.Self) -> None:
         setup_logging(self.verbose)
 
-    def _echo(self: t.Self, message: str, *args: P.args) -> None:
+    def _echo(self: t.Self, message: str, *args: t.Any) -> None:  # noqa: ANN401
         """Echo to the console."""
         message = message % args
         click.echo(f"{'  ' * self._indent}{message}")
 
-    def error(self: t.Self, message: str, *args: P.args) -> None:
+    def error(self: t.Self, message: str, *args: t.Any) -> None:  # noqa: ANN401
         """Echo to the console."""
         self._echo(message, *args)
 
-    def warning(self: t.Self, message: str, *args: P.args) -> None:
+    def warning(self: t.Self, message: str, *args: t.Any) -> None:  # noqa: ANN401
         """Echo to the console for -v."""
         if self.verbose > Verbosity.quiet:
             self._echo(message, *args)
 
-    def info(self: t.Self, message: str, *args: P.args) -> None:
+    def info(self: t.Self, message: str, *args: t.Any) -> None:  # noqa: ANN401
         """Echo to the console for -vv."""
         if self.verbose > Verbosity.verbose1:
             self._echo(message, *args)
 
-    def debug(self: t.Self, message: str, *args: P.args) -> None:
+    def debug(self: t.Self, message: str, *args: t.Any) -> None:  # noqa: ANN401
         """Echo to the console for -vvv."""
         if self.verbose > Verbosity.verbose2:
             self._echo(message, *args)

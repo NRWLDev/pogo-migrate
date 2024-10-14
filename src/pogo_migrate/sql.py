@@ -17,7 +17,7 @@ async def get_connection(connection_string: str) -> asyncpg.Connection:
 
 
 async def read_migrations(migrations_location: Path, db: asyncpg.Connection | None) -> list[Migration]:
-    applied_migrations = await get_applied_migrations(db) if db else []
+    applied_migrations = await get_applied_migrations(db) if db else set()
     return [
         Migration(path.stem, path, applied_migrations)
         for path in migrations_location.iterdir()
@@ -45,7 +45,7 @@ async def ensure_pogo_sync(db: asyncpg.Connection) -> None:
     );
     """
     r = await db.fetchrow(stmt)
-    if not r["exists"]:
+    if r is not None and not r["exists"]:
         stmt = """
         CREATE TABLE _pogo_migration (
             migration_hash VARCHAR(64),  -- sha256 hash of the migration id
