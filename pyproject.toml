@@ -141,6 +141,11 @@ ignore = [
 line-ending = "lf"
 quote-style = "double"
 
+[tool.uv]
+dev-dependencies = [
+    "pyright>=1.1.384",
+]
+
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
 

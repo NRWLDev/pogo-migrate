@@ -16,7 +16,7 @@ if t.TYPE_CHECKING:
     from pogo_migrate.context import Context
 
 
-squash_sql_template = dedent(
+squash_sql_template: str = dedent(
     """\
     --{message}
     -- depends:{depends}
@@ -66,7 +66,7 @@ def write(
     depends = f" {depends}" if depends else ""
     message = f" {latest.__doc__}"
     # add comment for which migrations were squashed in
-    squashed = "\n-- squashed: ".join(squashed[:-1])
+    squashed_comment = "\n-- squashed: ".join(squashed[:-1])
 
     apply = []
     for ident, statements_ in apply_statements.items():
@@ -99,11 +99,11 @@ def write(
         depends=depends,
         apply="\n\n".join(apply),
         rollback="\n\n".join(rollback),
-        squashed=squashed,
+        squashed=squashed_comment,
     )
     path.write_text(content)
 
-    return Migration(path.stem, path, [])
+    return Migration(path.stem, path, set())
 
 
 @dataclass

@@ -44,7 +44,7 @@ async def copy_yoyo_migration_history(context: Context, db: asyncpg.Connection) 
     """
     r = await db.fetchrow(stmt)
 
-    if r["count"] != 0:
+    if r is not None and r["count"] != 0:
         context.warning("migration history exists, skipping yoyo migration.")
         return
 
@@ -55,7 +55,7 @@ async def copy_yoyo_migration_history(context: Context, db: asyncpg.Connection) 
     )"""
     r = await db.fetchrow(stmt)
 
-    if not r["exists"]:
+    if r is not None and not r["exists"]:
         context.warning("yoyo migration history missing, skipping yoyo migration.")
         return
 

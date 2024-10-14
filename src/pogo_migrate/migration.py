@@ -28,7 +28,17 @@ def terminate_statements(statements: list[str]) -> list[str]:
     return statements
 
 
-def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable, bool]:
+def read_sql_migration(
+    path: Path,
+) -> tuple[
+    str,
+    str,
+    t.Callable[[asyncpg.Connection], t.Coroutine[t.Any, t.Any, t.Any]],
+    t.Callable[[asyncpg.Connection], t.Coroutine[t.Any, t.Any, t.Any]],
+    bool,
+    list[str],
+    list[str],
+]:
     """Read a sql migration.
 
     Parse the message, [depends], apply statements, and rollback statements.
@@ -47,8 +57,8 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable, bool]
             msg = f"{path.name}: No '-- depends:' or message found."
             raise exceptions.BadMigrationError(msg)
 
-        message = m[1].strip()
-        depends = m[2].strip()
+        message: str = m[1].strip()
+        depends: str = m[2].strip()
         use_transaction = "-- transaction: false" not in metadata
 
         try:
@@ -59,7 +69,7 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable, bool]
 
         apply_statements = terminate_statements(sqlparse.split(apply_content.strip()))
 
-        async def apply(db):  # noqa: ANN001, ANN202
+        async def apply(db: asyncpg.Connection) -> None:
             for statement in apply_statements:
                 # Skip comments
                 statement_ = strip_comments(statement)
@@ -68,7 +78,7 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable, bool]
 
         rollback_statements = terminate_statements(sqlparse.split(rollback_content.strip()))
 
-        async def rollback(db):  # noqa: ANN001, ANN202
+        async def rollback(db: asyncpg.Connection) -> None:
             for statement in rollback_statements:
                 # Skip comments
                 statement_ = strip_comments(statement)
@@ -81,11 +91,11 @@ def read_sql_migration(path: Path) -> tuple[str, t.Awaitable, t.Awaitable, bool]
 class Migration:
     __migrations: t.ClassVar[dict[str, Migration]] = {}
 
-    def __init__(self: t.Self, mig_id: str | None, path: str, applied_migrations: set[str] | None) -> None:
+    def __init__(self: t.Self, mig_id: str, path: Path, applied_migrations: set[str] | None) -> None:
         applied_migrations = applied_migrations or set()
         self.id = mig_id
         self.path = path
-        self.hash = hashlib.sha256(mig_id.encode("utf-8")).hexdigest() if mig_id else None
+        self.hash: str | None = hashlib.sha256(mig_id.encode("utf-8")).hexdigest() if mig_id else None
         self._use_transaction: bool = True
         self._doc: str | None = None
         self._depends: set[Migration] | None = None
@@ -103,7 +113,7 @@ class Migration:
 
     @property
     def depends(self: t.Self) -> set[Migration]:
-        return self._depends
+        return self._depends or set()
 
     @property
     def use_transaction(self: t.Self) -> bool:
@@ -111,7 +121,7 @@ class Migration:
 
     @property
     def depends_ids(self: t.Self) -> set[str]:
-        return {m.id for m in self._depends}
+        return {m.id for m in self.depends}
 
     @property
     def is_sql(self: t.Self) -> bool:

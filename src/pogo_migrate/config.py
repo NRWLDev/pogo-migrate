@@ -32,10 +32,10 @@ class Config:
         return self.database_config.format(**format_kwargs)
 
     @classmethod
-    def from_dict(cls: type[Config], data: dict, root_directory: Path) -> Config:
-        data["root_directory"] = root_directory
-        data["migrations"] = root_directory / data["migrations"]
-        return cls(**data)
+    def from_dict(cls: type[Config], data: dict[str, str], root_directory: Path) -> Config:
+        data["root_directory"] = root_directory  # type: ignore[reportArgumentType]
+        data["migrations"] = root_directory / data["migrations"]  # type: ignore[reportArgumentType]
+        return cls(**data)  # type: ignore[reportArgumentType]
 
 
 def find_config() -> Path | None:

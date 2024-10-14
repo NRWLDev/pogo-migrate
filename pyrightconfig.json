@@ -1,0 +1,1 @@
+{"venv": ".", "venvPath": ".venv", "exclude": ["tests"], "include": ["src/pogo_migrate"]}

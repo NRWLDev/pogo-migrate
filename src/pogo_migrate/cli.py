@@ -59,7 +59,7 @@ def _callback(  # pragma: no cover
 ) -> None: ...
 
 
-app = typer.Typer(name="pogo", callback=_callback)
+app: typer.Typer = typer.Typer(name="pogo", callback=_callback)
 
 
 P = ParamSpec("P")
@@ -166,7 +166,7 @@ def init(
     asyncio.run(init_())
 
 
-migration_template = dedent(
+migration_template: str = dedent(
     '''\
     """
     {message}
@@ -184,7 +184,7 @@ migration_template = dedent(
     ''',
 )
 
-migration_sql_template = dedent(
+migration_sql_template: str = dedent(
     """\
     --{message}
     -- depends:{depends}
@@ -251,7 +251,7 @@ def create_with_editor(config: Config, content: str, extension: str, context: Co
                     raise typer.Exit(code=1)
 
             try:
-                migration = Migration(None, Path(tmpfile.name), None)
+                migration = Migration("temporary", Path(tmpfile.name), None)
                 migration.load()
                 message = migration.__doc__
                 break
