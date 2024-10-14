@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.3 (released 2024-10-14)
+
+### Miscellaneous
+
+- Clean up external type hints [[bb608a4](https://github.com/NRWLDev/pogo-migrate/commit/bb608a4ff0cc0aa30e3c57b63d87deed52016aae)]
+
 ## v0.2.2 (released 2024-10-14)
 
 ### Bug fixes
