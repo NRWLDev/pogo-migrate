@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.2 (released 2024-10-14)
+
+### Bug fixes
+
+- Add py.typed [[29c0c3a](https://github.com/NRWLDev/pogo-migrate/commit/29c0c3ae4ba7b5c08de8034fc97e262d2c6c9958)]
+
 ## v0.2.1 (released 2024-10-02)
 
 ### Bug fixes
