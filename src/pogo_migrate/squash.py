@@ -125,6 +125,7 @@ def parse(context: Context, statement: str) -> ParsedStatement:
                 (sqlparse.tokens.Keyword, "TABLE"),
                 (sqlparse.tokens.Keyword, "AGGREGATE"),
                 (sqlparse.tokens.Keyword, "INDEX"),
+                (sqlparse.tokens.Keyword, "SCHEMA"),
                 (None, "EXTENSION"),
             ],
         )
@@ -180,8 +181,8 @@ def parse_sqlglot(context: Context, statement: str) -> ParsedStatement:
 
     identifier = None
     if isinstance(parsed, (exp.Create, exp.Alter, exp.Drop)):
-        table = parsed.find(exp.Table)
-        identifier = table.name
+        ident = parsed.find(exp.Table)
+        identifier = ident.name if ident.this is not None else str(ident).replace('"', "")
     elif isinstance(parsed, exp.Command):
         # Unhandled syntax by sqlglot, fallback to sqlparse
         context.warning("sqlglot failed to parse, falling back to sqlparse.")
