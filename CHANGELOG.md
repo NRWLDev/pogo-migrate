@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.4 (released 2024-10-24)
+
+### Bug fixes
+
+- Handle create/drop schema parsing. [[dbe3d20](https://github.com/NRWLDev/pogo-migrate/commit/dbe3d20a7823782d48da32a676ad5c2bf07e24b0)]
+
+### Miscellaneous
+
+- Clean up more type warnings [[20f464f](https://github.com/NRWLDev/pogo-migrate/commit/20f464f3dd17e547dd21eeed58c66f30109b49f7)]
+
 ## v0.2.3 (released 2024-10-14)
 
 ### Miscellaneous
