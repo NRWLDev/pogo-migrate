@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.5 (released 2024-11-28)
+
+### Features and Improvements
+
+- Support mark/unmark of a single migration. [[f68abac](https://github.com/NRWLDev/pogo-migrate/commit/f68abacbc8fc9395d34bc46ec56073e4e1e90ea5)]
+
 ## v0.2.4 (released 2024-10-24)
 
 ### Bug fixes
