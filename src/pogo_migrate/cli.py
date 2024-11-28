@@ -737,6 +737,7 @@ def validate(
 
 @app.command("mark")
 def mark(
+    migration_id: t.Optional[str] = typer.Option(None, "-m", "--migration", help="Specific migration to mark."),
     database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
     interactive: bool = typer.Option(True, help="Confirm all changes."),  # noqa: FBT003
@@ -750,7 +751,10 @@ def mark(
         max=3,
     ),
 ) -> None:
-    """Mark a migration as applied, without running."""
+    """Mark migrations as applied, without running.
+
+    If a migration_id is provided other migrations will be ignored.
+    """
     context = Context(verbose)
 
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
@@ -763,7 +767,7 @@ def mark(
         db = await sql.get_connection(connection_string)
 
         migrations = await sql.read_migrations(config.migrations, db)
-        migrations = topological_sort([m.load() for m in migrations])
+        migrations = topological_sort([m.load() for m in migrations if migration_id is None or m.id == migration_id])
 
         async with db.transaction():
             for migration in migrations:
@@ -779,6 +783,7 @@ def mark(
 
 @app.command("unmark")
 def unmark(
+    migration_id: t.Optional[str] = typer.Option(None, "-m", "--migration", help="Specific migration to mark."),
     database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
     dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
@@ -791,7 +796,10 @@ def unmark(
         max=3,
     ),
 ) -> None:
-    """Mark a migration as unapplied, without rolling back."""
+    """Mark migrations as unapplied, without rolling back.
+
+    If a migration_id is provided other migrations will be ignored.
+    """
     context = Context(verbose)
 
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
@@ -804,7 +812,9 @@ def unmark(
         db = await sql.get_connection(connection_string)
 
         migrations = await sql.read_migrations(config.migrations, db)
-        migrations = reversed(topological_sort([m.load() for m in migrations]))
+        migrations = reversed(
+            topological_sort([m.load() for m in migrations if migration_id is None or m.id == migration_id]),
+        )
 
         async with db.transaction():
             for migration in migrations:
