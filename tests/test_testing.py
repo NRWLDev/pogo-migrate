@@ -26,9 +26,10 @@ async def test_apply(monkeypatch, db_session, cwd):
     )
 
 
-async def test_apply_loads_db(monkeypatch, db_session, cwd):
+async def test_apply_loads_db(monkeypatch, cwd):
     monkeypatch.setattr(testing.migrate, "apply", AsyncMock())
-    monkeypatch.setattr(testing.sql, "get_connection", AsyncMock(return_value=db_session))
+    mock_session = mock.Mock(close=AsyncMock(return_value=None))
+    monkeypatch.setattr(testing.sql, "get_connection", AsyncMock(return_value=mock_session))
     await testing.apply()
 
     assert testing.migrate.apply.call_args == mock.call(
@@ -38,8 +39,9 @@ async def test_apply_loads_db(monkeypatch, db_session, cwd):
             migrations=cwd / "migrations",
             database_config="{POSTGRES_DSN}",
         ),
-        db_session,
+        mock_session,
     )
+    assert mock_session.close.call_count == 1
 
 
 async def test_rollback(monkeypatch, db_session, cwd):
@@ -57,9 +59,10 @@ async def test_rollback(monkeypatch, db_session, cwd):
     )
 
 
-async def test_rollback_loads_db(monkeypatch, db_session, cwd):
+async def test_rollback_loads_db(monkeypatch, cwd):
     monkeypatch.setattr(testing.migrate, "rollback", AsyncMock())
-    monkeypatch.setattr(testing.sql, "get_connection", AsyncMock(return_value=db_session))
+    mock_session = mock.Mock(close=AsyncMock(return_value=None))
+    monkeypatch.setattr(testing.sql, "get_connection", AsyncMock(return_value=mock_session))
     await testing.rollback()
 
     assert testing.migrate.rollback.call_args == mock.call(
@@ -69,5 +72,6 @@ async def test_rollback_loads_db(monkeypatch, db_session, cwd):
             migrations=cwd / "migrations",
             database_config="{POSTGRES_DSN}",
         ),
-        db_session,
+        mock_session,
     )
+    assert mock_session.close.call_count == 1

@@ -12,14 +12,20 @@ if t.TYPE_CHECKING:
 async def apply(db: asyncpg.Connection | None = None) -> None:
     context = Context()
     c = config.load_config()
-    if db is None:
-        db = await sql.get_connection(c.database_dsn)
-    await migrate.apply(context, c, db)
+    db_ = db if db is not None else await sql.get_connection(c.database_dsn)
+    try:
+        await migrate.apply(context, c, db_)
+    finally:
+        if db is None:
+            await db_.close()
 
 
 async def rollback(db: asyncpg.Connection | None = None) -> None:
     context = Context()
     c = config.load_config()
-    if db is None:
-        db = await sql.get_connection(c.database_dsn)
-    await migrate.rollback(context, c, db)
+    db_ = db if db is not None else await sql.get_connection(c.database_dsn)
+    try:
+        await migrate.rollback(context, c, db_)
+    finally:
+        if db is None:
+            await db_.close()
