@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.6 (released 2024-12-23)
+
+### Bug fixes
+
+- Ensure manually created database connections are closed during test fixtures. [[d483224](https://github.com/NRWLDev/pogo-migrate/commit/d483224c4c8c4400f720449fe743c23940d49b8b)]
+
 ## v0.2.5 (released 2024-11-28)
 
 ### Features and Improvements
