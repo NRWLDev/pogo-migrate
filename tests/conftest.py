@@ -105,6 +105,7 @@ async def db_session(postgres_dsn):
         yield conn
     finally:
         await tr.rollback()
+        await conn.close()
 
 
 @pytest.fixture
