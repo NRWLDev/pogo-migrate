@@ -233,24 +233,205 @@ class TestNew:
         assert cli.subprocess.call.call_args == mock.call(["vim", str(f)])
 
     @pytest.mark.usefixtures("pyproject")
-    def test_file_written(self, monkeypatch, cli_runner, cwd):
-        monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
+    @pytest.mark.parametrize(
+        ("extra_args", "expected"),
+        [
+            (
+                [],
+                dedent("""\
+                --
+                -- depends:
+
+                -- migrate: apply
+
+                -- migrate: rollback
+
+                """),
+            ),
+            (
+                ["--py"],
+                dedent('''\
+                """
+
+                """
+
+                __depends__ = []
+
+
+                async def apply(db):
+                    ...
+
+
+                async def rollback(db):
+                    ...
+                '''),
+            ),
+        ],
+    )
+    def test_file_written(self, monkeypatch, cli_runner, cwd, extra_args, expected):
+        monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file"))
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
 
-        result = cli_runner.invoke(["new"])
+        result = cli_runner.invoke(["new", *extra_args])
 
         assert result.exit_code == 0, result.output
-        with (cwd / "new_file.py").open() as f:
-            assert f.read() == dedent("""\
-            --
+        with (cwd / "new_file").open() as f:
+            assert f.read() == expected
+
+    @pytest.mark.usefixtures("pyproject")
+    @pytest.mark.parametrize(
+        ("extra_args", "expected"),
+        [
+            (
+                [],
+                dedent("""\
+                --
+                -- depends: 20210101_01_rando-commit
+
+                -- migrate: apply
+
+                -- migrate: rollback
+
+                """),
+            ),
+            (
+                ["--py"],
+                dedent('''\
+                """
+
+                """
+
+                __depends__ = ["20210101_01_rando-commit"]
+
+
+                async def apply(db):
+                    ...
+
+
+                async def rollback(db):
+                    ...
+                '''),
+            ),
+        ],
+    )
+    def test_dependency_detected_file_written(
+        self,
+        monkeypatch,
+        cli_runner,
+        cwd,
+        migration_file_factory,
+        extra_args,
+        expected,
+    ):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
             -- depends:
 
             -- migrate: apply
-
             -- migrate: rollback
+            """),
+        )
+        monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.sql"))
+        monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
+        monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
 
-            """)
+        result = cli_runner.invoke(["new", *extra_args])
+
+        assert result.exit_code == 0, result.output
+        with (cwd / "new_file.sql").open() as f:
+            assert f.read() == expected
+
+    @pytest.mark.usefixtures("pyproject")
+    @pytest.mark.parametrize(
+        ("extra_args", "expected"),
+        [
+            (
+                [],
+                dedent("""\
+                --
+                -- depends: 20210101_01_rando-commit 20210101_02_rando-commit
+
+                -- migrate: apply
+
+                -- migrate: rollback
+
+                """),
+            ),
+            (
+                ["--py"],
+                dedent('''\
+                """
+
+                """
+
+                __depends__ = ["20210101_01_rando-commit", "20210101_02_rando-commit"]
+
+
+                async def apply(db):
+                    ...
+
+
+                async def rollback(db):
+                    ...
+                '''),
+            ),
+        ],
+    )
+    def test_multiple_head_dependencies_detected_file_written(
+        self,
+        monkeypatch,
+        cli_runner,
+        cwd,
+        migration_file_factory,
+        extra_args,
+        expected,
+    ):
+        migration_file_factory(
+            "20200101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20200101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20200101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.sql"))
+        monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
+        monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
+
+        result = cli_runner.invoke(["new", *extra_args])
+
+        assert result.exit_code == 0, result.output
+        with (cwd / "new_file.sql").open() as f:
+            assert f.read() == expected
 
     @pytest.mark.usefixtures("pyproject")
     def test_load_failed_quit(self, monkeypatch, cli_runner):
@@ -362,7 +543,7 @@ class TestHistory:
         )
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    def test_migrations_nono_config(self, migration_file_factory, cli_runner):
+    def test_migrations_no_config(self, migration_file_factory, cli_runner):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
