@@ -121,6 +121,7 @@ source = ["src/pogo_migrate"]
 [tool.ruff]
 target-version = "py39"
 line-length = 120
+output-format = "concise"
 
 [tool.ruff.lint]
 select = ["ALL"]
