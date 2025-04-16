@@ -30,7 +30,7 @@ def terminate_statements(statements: list[str]) -> list[str]:
     return statements
 
 
-def read_sql_migration(
+def read_sql_migration(  # noqa: C901
     path: Path,
 ) -> tuple[str, str, MigrationFunc, MigrationFunc, bool, list[str], list[str]]:
     """Read a sql migration.
@@ -49,6 +49,10 @@ def read_sql_migration(
 
         if m is None:
             msg = f"{path.name}: No '-- depends:' or message found."
+            raise exceptions.BadMigrationError(msg)
+
+        if metadata.count("-- depends:") > 1:
+            msg = f"{path.name}: Multiple '-- depends:' defined."
             raise exceptions.BadMigrationError(msg)
 
         message: str = m[1].strip()
