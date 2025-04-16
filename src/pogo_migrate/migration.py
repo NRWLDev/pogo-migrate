@@ -193,3 +193,9 @@ def topological_sort(migrations: t.Iterable[Migration]) -> list[Migration]:
             ", ".join(m.id for m in e.args[1]),
         )
         raise exceptions.BadMigrationError(msg) from e
+
+
+def find_heads(migrations: t.Iterable[Migration]) -> list[Migration]:
+    migration_list = list(migrations)
+    dependents = list(set().union(*[m.depends for m in migration_list]))
+    return [m for m in migration_list if m not in dependents]

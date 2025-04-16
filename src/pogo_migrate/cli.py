@@ -22,7 +22,7 @@ import typer
 from pogo_migrate import exceptions, migrate, sql, squash, yoyo
 from pogo_migrate.config import Config, load_config
 from pogo_migrate.context import Context
-from pogo_migrate.migration import Migration, read_sql_migration, topological_sort
+from pogo_migrate.migration import Migration, find_heads, read_sql_migration, topological_sort
 from pogo_migrate.util import get_editor, make_file
 
 if sys.version_info < (3, 10):
@@ -297,12 +297,12 @@ def new(
         config = load_config()
 
         migrations = await sql.read_migrations(config.migrations, db=None)
-        migrations = topological_sort([m.load() for m in migrations])
+        heads = find_heads([m.load() for m in migrations])
 
         template = migration_sql_template if not py_ else migration_template
-        depends = migrations[-1].id if migrations else ""
-        depends = f" {depends}" if not py_ and depends else ([depends] if depends else depends)
-        depends = f'''"{'", "'.join(depends)}"''' if py_ and depends else depends
+        depends = sorted([m.id for m in heads])
+        depends = f" {' '.join(depends)}" if not py_ and depends else depends
+        depends = f'''"{'", "'.join(depends)}"''' if py_ and depends else (depends or "")
         message = f" {message_}" if not py_ and message_ else message_
         content = template.format(message=message, depends=depends)
         extension = ".sql" if not py_ else ".py"
