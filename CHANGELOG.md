@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.2.7 (released 2025-04-16)
+
+### Bug fixes
+
+- Detect incorrectly defined multiple dependencies in sql migrations. [[33](https://github.com/NRWLDev/pogo-migrate/issues/33)] [[1f76338](https://github.com/NRWLDev/pogo-migrate/commit/1f76338f7a6cce6ec13bfbc7ea6944656a56597b)]
+- Detect multiple heads when determining dependencies for a new migration. [[34](https://github.com/NRWLDev/pogo-migrate/issues/34)] [[54438d6](https://github.com/NRWLDev/pogo-migrate/commit/54438d6090bc1ab09d2aea5183a3edc167a8f5d6)]
+
+### Miscellaneous
+
+- Ensure test db connection is closed during tests. [[1081ebb](https://github.com/NRWLDev/pogo-migrate/commit/1081ebb2107f304c62017a43eb73ebc0310a5e04)]
+
 ## v0.2.6 (released 2024-12-23)
 
 ### Bug fixes
