@@ -43,7 +43,22 @@ class TestReadSqlMigration:
 
         assert str(e.value) == "20210101_01_rando-commit.sql: No '-- migrate: rollback' found."
 
-    def test_invalid_metadata(self, migration_file_factory):
+    def test_invalid_metadata_no_message(self, migration_file_factory):
+        mp = migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- depends: migration-id
+
+            -- migrate: apply
+            """),
+        )
+        with pytest.raises(exceptions.BadMigrationError) as e:
+            migration.read_sql_migration(mp)
+
+        assert str(e.value) == "20210101_01_rando-commit.sql: No '-- depends:' or message found."
+
+    def test_invalid_metadata_no_depends(self, migration_file_factory):
         mp = migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -57,6 +72,23 @@ class TestReadSqlMigration:
             migration.read_sql_migration(mp)
 
         assert str(e.value) == "20210101_01_rando-commit.sql: No '-- depends:' or message found."
+
+    def test_invalid_metadata_duplicate_depends(self, migration_file_factory):
+        mp = migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20200101_01_rando-initial-commit
+            -- depends: 20200101_02_rando-initial-commit
+
+            -- migrate: apply
+            """),
+        )
+        with pytest.raises(exceptions.BadMigrationError) as e:
+            migration.read_sql_migration(mp)
+
+        assert str(e.value) == "20210101_01_rando-commit.sql: Multiple '-- depends:' defined."
 
     def test_metadata_parsed(self, migration_file_factory):
         mp = migration_file_factory(
@@ -73,6 +105,26 @@ class TestReadSqlMigration:
             """),
         )
         message, depends, _, _, _, _, _ = migration.read_sql_migration(mp)
+        assert message == "migration message"
+        assert depends == "20200101_01_rando-initial-commit"
+
+    def test_metadata_parsed_multiple_dependencies(self, migration_file_factory):
+        mp = migration_file_factory(
+            "20210101_01_rando-migration-message",
+            "sql",
+            dedent("""
+            -- migration message
+            -- depends: 20200101_01_rando-initial-commit 20200101_02_rando-initial-commit
+
+            -- migrate: apply
+            CREATE TABLE table_one();
+            CREATE TABLE table_two();
+            -- migrate: rollback
+            """),
+        )
+        message, depends, _, _, _, _, _ = migration.read_sql_migration(mp)
+        assert message == "migration message"
+        assert depends == "20200101_01_rando-initial-commit 20200101_02_rando-initial-commit"
 
     async def test_apply_func_created(self, migration_file_factory):
         mp = migration_file_factory(
@@ -263,6 +315,53 @@ class TestMigration:
 
         assert m.depends == set()
         assert m2.depends == {m}
+
+    def test_depends_with_multiple_dependencies(self, migration_file_factory):
+        mp = migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        mp2 = migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        mp3 = migration_file_factory(
+            "20210101_03_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit 20210101_02_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+
+        m = migration.Migration(mp.stem, mp, None)
+        m2 = migration.Migration(mp2.stem, mp2, None)
+        m3 = migration.Migration(mp3.stem, mp3, None)
+
+        m.load()
+        m2.load()
+        m3.load()
+
+        assert m.depends == set()
+        assert m2.depends == set()
+        assert m3.depends == {m, m2}
 
     def test_depends_ids(self, migration_file_factory):
         mp = migration_file_factory(
