@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.8 (released 2025-05-05)
+
+### Bug fixes
+
+- Ensure urls render in pypi. [[bd908ba](https://github.com/NRWLDev/pogo-migrate/commit/bd908ba625adb38b6471d0252223f0d6f5b904bf)]
+
 ## v0.2.7 (released 2025-04-16)
 
 ### Bug fixes
