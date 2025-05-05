@@ -3,7 +3,6 @@ name = "pogo-migrate"
 version = "0.2.7"
 description = "Database migration tool for asyncpg"
 readme = "README.md"
-homepage = "https://github.com/NRWLDev/pogo-migrate"
 authors = [
     {name = "Daniel Edgecombe", email = "daniel@nrwl.co"},
 ]
@@ -39,6 +38,9 @@ dependencies = [
     "typing_extensions >= 4.7.0; python_version <= '3.10'",
     "sqlglot >= 25.19",
 ]
+
+[project.urls]
+homepage = "https://github.com/NRWLDev/pogo-migrate"
 
 [project.optional-dependencies]
 dev = [
