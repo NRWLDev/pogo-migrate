@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.9 (released 2025-05-05)
+
+### Documentation
+
+- Add documentation url for pypi. [[b3c15bc](https://github.com/NRWLDev/pogo-migrate/commit/b3c15bcbbd975d5d300a225d7ae703650fe76ff8)]
+
 ## v0.2.8 (released 2025-05-05)
 
 ### Bug fixes
