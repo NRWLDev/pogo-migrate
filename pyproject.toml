@@ -41,6 +41,7 @@ dependencies = [
 
 [project.urls]
 homepage = "https://github.com/NRWLDev/pogo-migrate"
+documentation = "https://nrwldev.github.io/pogo-migrate/"
 
 [project.optional-dependencies]
 dev = [
