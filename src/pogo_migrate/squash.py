@@ -126,15 +126,12 @@ def parse(context: Context, statement: str) -> ParsedStatement:
                 (sqlparse.tokens.Keyword, "AGGREGATE"),
                 (sqlparse.tokens.Keyword, "INDEX"),
                 (sqlparse.tokens.Keyword, "SCHEMA"),
-                (None, "EXTENSION"),
+                (sqlparse.tokens.Keyword, "EXTENSION"),
             ],
         )
 
         exists_idx, _token = parsed.token_next_by(idx=idx, m=(sqlparse.tokens.Keyword, "EXISTS"))
-        if action.value.startswith("EXTENSION "):
-            # Extension is not picked up as a specific type, so it can include the extension name.
-            identifier = action.value.split()[1]
-        elif action.value == "INDEX":
+        if action.value == "INDEX":
             """
             Fetch tbl_ident from CREATE INDEX statements.
             Fetch ident from DROP INDEX statements.
