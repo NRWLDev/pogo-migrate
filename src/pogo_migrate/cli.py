@@ -404,7 +404,7 @@ def apply(
         connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
 
-        await migrate.apply(context, config, db)
+        await migrate.apply(db, config.migrations, logger=context)
 
     asyncio.run(apply_())
 
@@ -441,7 +441,7 @@ def rollback(
         connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
 
-        await migrate.rollback(context, config, db, count=count if count > 0 else None)
+        await migrate.rollback(db, config.migrations, logger=context, count=count if count > 0 else None)
 
     asyncio.run(rollback_())
 
