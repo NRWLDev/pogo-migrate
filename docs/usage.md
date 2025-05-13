@@ -1,4 +1,6 @@
-# Setting up
+# Usage
+
+## Setting up
 
 To help with getting started, the `pogo init` command will initialise the
 migrations folder, as well as setup the basic configuration for `pogo`.
@@ -12,7 +14,7 @@ Supported flags:
   [configuration](https://nrwldev.github.io/pogo-migrate/configuration/) for
   examples.
 
-## Migrating from yoyo
+### Migrating from yoyo
 
 If you are coming here having previously used `yoyo`, a lot of migrations can
 be directly converted to `pogo` (namely sql migrations). Python migrations will
@@ -32,7 +34,7 @@ your code will likely already contain the migrated files, and as such just the
 database history needs to be copied. In deployed environments `--skip-files`
 would be used.
 
-# New migrations
+## New migrations
 
 To create a new migration use `pogo new`. This will template out the migration
 file and open the file in your configured text editor (`vi` by default).
@@ -47,7 +49,7 @@ Supported flags:
 $ pogo new -m "a descriptive message"
 ```
 
-# Applying migrations
+## Applying migrations
 
 To apply (unapplied) migrations, run `pogo apply`. Any previously run
 migrations will be skipped over, and any new ones will be run in (topological,
@@ -60,7 +62,7 @@ Supported flags:
 - `--dotenv, --no-dotenv` load environment from local `.env` file. (defaults to
   `--no-dotenv`)
 
-## Marking a migration as applied
+### Marking a migration as applied
 
 In some scenarios a migration will be added to track changes to the database
 that might have been made on the fly as part of a fix. To maintain history and
@@ -74,7 +76,7 @@ confirm which ones to mark as applied.
   `--no-dotenv`)
 - `--interactive, --no-interactive` confirm all changes. (defaults to `--interactive)
 
-# Rolling back migrations
+## Rolling back migrations
 
 To rollback (applied) migrations, run `pogo rollback`. By default the most
 recently applied migration will be rolled back.
@@ -87,7 +89,7 @@ Supported flags:
 - `--dotenv, --no-dotenv` load environment from local `.env` file. (defaults to
   `--no-dotenv`)
 
-## Marking a migration as rolled back
+### Marking a migration as rolled back
 
 To flag a migration as rolled back (without actually rolling back), `pogo
 unmark` will mark a migration as unapplied.
@@ -97,7 +99,7 @@ unmark` will mark a migration as unapplied.
 - `--dotenv, --no-dotenv` load environment from local `.env` file. (defaults to
   `--no-dotenv`)
 
-# View migration status
+## View migration status
 
 `pogo history` will list available migrations. Each migration will be prefixed
 with one of U (unapplied) or A (applied), as well as the migration format `sql` or `py`.
@@ -117,13 +119,13 @@ unapplied migrations.
 $ pogo history --unapplied --simple | wc -l
 ```
 
-# Managing migrations
+## Managing migrations
 
 These commands are mostly experimental and should be used with caution.  They
 have been tested on multiple projects but it is likely not all edge cases have
 been found yet.  Please raise any issues you find when using them in github.
 
-## Remove a migration from the dependency chain
+### Remove a migration from the dependency chain
 
 Remove a specific migration from the dependency chain. This can be useful to
 remove hotfixes or data migrations that are only needed in live environments,
@@ -139,7 +141,7 @@ Supported flags:
   (defaults to `./migrations`)
 - `--backup` keep any removed files with `.bak` suffix.
 
-## Squashing migrations
+### Squashing migrations
 
 `pogo squash` will perform a best effort to iterate through all migrations, and
 detect where multiple migrations can be condensed into a single migration.
@@ -168,7 +170,7 @@ Supported flags:
   migrations, non transaction migrations). Allows for removal of unnecessary
   migrations.
 
-## Cleaning up backups
+### Cleaning up backups
 
 `pogo clean` will remove `.bak` files created during `remove` and `squash`
 commands.
@@ -178,7 +180,7 @@ Supported flags:
 - `-m, --migrations-location` defines the name of the migrations folder
   (defaults to `./migrations`)
 
-# Validate migration sql
+## Validate migration sql
 
 `pogo validate` will iterate through all migrations and do a best effort
 attempt to validate each sql statement to report any potential issues, like
@@ -189,7 +191,7 @@ Supported flags:
 - `-m, --migrations-location` defines the name of the migrations folder
   (defaults to `./migrations`)
 
-# Usage in python
+## Usage in python
 
 If you want to manage your migrations in python code rather than through the
 cli. The migrate module provides the interface required.
