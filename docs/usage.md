@@ -188,3 +188,35 @@ Supported flags:
 
 - `-m, --migrations-location` defines the name of the migrations folder
   (defaults to `./migrations`)
+
+# Usage in python
+
+If you want to manage your migrations in python code rather than through the
+cli. The migrate module provides the interface required.
+
+```python
+from pogo_migrate import config, migrate, sql
+
+c = config.load_config()
+conn = await sql.get_connection(c.database_dsn)
+
+await migrate.apply(db=conn, migrations_dir=c.migrations)
+await migrate.rollback(db=conn, migrations_dir=c.migrations)
+```
+
+An optional `logger` parameter can be provided to override the internal logger in both `apply()` and `rollback()`.
+
+
+Alternatively if you already have access to the migrations location and a
+database connection (for example from an application framework), the code can
+be simplified down to.
+
+```python
+from pogo_migrate import migrate
+
+migrations_dir = Path("/path/to/migrations")
+conn = await asyncpg.connect(postgres_dsn)
+
+await migrate.apply(db=conn, migrations_dir=c.migrations)
+await migrate.rollback(db=conn, migrations_dir=c.migrations)
+```

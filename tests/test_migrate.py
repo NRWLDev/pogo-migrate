@@ -104,27 +104,27 @@ class Base:
 class TestApply(Base):
     @pytest.mark.usefixtures("migrations")
     async def test_no_migrations_applies_pogo_tables(self, config, db_session, context):
-        await migrate.apply(context, config, db_session)
+        await migrate.apply(db_session, config.migrations, context)
 
         await self.assert_tables(db_session, ["_pogo_migration", "_pogo_version"])
 
     @pytest.mark.usefixtures("_migration_two")
     async def test_migrations_applied(self, config, db_session, context):
-        await migrate.apply(context, config, db_session)
+        await migrate.apply(db_session, config.migrations, context)
 
         await self.assert_tables(db_session, ["_pogo_migration", "_pogo_version", "table_one", "table_two"])
 
     @pytest.mark.usefixtures("_migration_two")
     async def test_already_applied_skips(self, config, db_session, context):
-        await migrate.apply(context, config, db_session)
-        await migrate.apply(context, config, db_session)
+        await migrate.apply(db_session, config.migrations, context)
+        await migrate.apply(db_session, config.migrations, context)
 
         await self.assert_tables(db_session, ["_pogo_migration", "_pogo_version", "table_one", "table_two"])
 
     @pytest.mark.usefixtures("_broken_apply")
     async def test_broken_migration_not_applied(self, config, db_session, context):
         with pytest.raises(exceptions.BadMigrationError) as e:
-            await migrate.apply(context, config, db_session)
+            await migrate.apply(db_session, config.migrations, context)
 
         await self.assert_tables(db_session, ["_pogo_migration", "_pogo_version", "table_one", "table_two"])
         assert str(e.value) == "Failed to apply 20240318_01_12345-broken-apply"
@@ -133,29 +133,29 @@ class TestApply(Base):
 class TestRollback(Base):
     @pytest.mark.usefixtures("migrations")
     async def test_no_migrations_applies_pogo_tables(self, config, db_session, context):
-        await migrate.rollback(context, config, db_session)
+        await migrate.rollback(db_session, config.migrations, logger=context)
 
         await self.assert_tables(db_session, ["_pogo_migration", "_pogo_version"])
 
     @pytest.mark.usefixtures("_migration_two")
     async def test_latest_removed(self, config, db_session, context):
-        await migrate.apply(context, config, db_session)
-        await migrate.rollback(context, config, db_session, count=1)
+        await migrate.apply(db_session, config.migrations, context)
+        await migrate.rollback(db_session, config.migrations, logger=context, count=1)
 
         await self.assert_tables(db_session, ["_pogo_migration", "_pogo_version", "table_one"])
 
     @pytest.mark.usefixtures("_migration_two")
     async def test_all_removed(self, config, db_session, context):
-        await migrate.apply(context, config, db_session)
-        await migrate.rollback(context, config, db_session)
+        await migrate.apply(db_session, config.migrations, context)
+        await migrate.rollback(db_session, config.migrations, logger=context)
 
         await self.assert_tables(db_session, ["_pogo_migration", "_pogo_version"])
 
     @pytest.mark.usefixtures("_broken_rollback")
     async def test_broken_rollback_rollsback(self, config, db_session, context):
-        await migrate.apply(context, config, db_session)
+        await migrate.apply(db_session, config.migrations, context)
         with pytest.raises(exceptions.BadMigrationError) as e:
-            await migrate.rollback(context, config, db_session, count=1)
+            await migrate.rollback(db_session, config.migrations, logger=context, count=1)
 
         await self.assert_tables(
             db_session,
