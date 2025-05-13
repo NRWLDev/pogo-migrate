@@ -36,7 +36,7 @@ tempfile_prefix = "_tmp_pogonew"
 def load_dotenv() -> None:
     dotenv.load_dotenv(
         dotenv.find_dotenv(usecwd=True),
-        override=True,
+        override=False,
     )
 
 
@@ -292,8 +292,7 @@ def new(
 
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def new_() -> None:
-        if dotenv:  # pragma: no cover
-            load_dotenv()
+        load_dotenv()
         config = load_config()
 
         migrations = await sql.read_migrations(config.migrations, db=None)
@@ -325,7 +324,6 @@ def history(
     *,
     unapplied: bool = typer.Option(False, help="Show only unapplied migrations."),  # noqa: FBT003
     simple: bool = typer.Option(False, help="Show raw data without tabulation."),  # noqa: FBT003
-    dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -344,8 +342,7 @@ def history(
 
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def history_() -> None:
-        if dotenv:  # pragma: no cover
-            load_dotenv()
+        load_dotenv()
         config = load_config()
 
         try:
@@ -382,7 +379,6 @@ def history(
 def apply(
     database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
-    dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -397,8 +393,7 @@ def apply(
 
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def apply_() -> None:
-        if dotenv:  # pragma: no cover
-            load_dotenv()
+        load_dotenv()
         config = load_config()
 
         connection_string = database or config.database_dsn
@@ -419,7 +414,6 @@ def rollback(
         help="Number of migrations to rollback",
     ),
     *,
-    dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -434,8 +428,7 @@ def rollback(
 
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def rollback_() -> None:
-        if dotenv:  # pragma: no cover
-            load_dotenv()
+        load_dotenv()
         config = load_config()
 
         connection_string = database or config.database_dsn
@@ -741,7 +734,6 @@ def mark(
     database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
     interactive: bool = typer.Option(True, help="Confirm all changes."),  # noqa: FBT003
-    dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -759,8 +751,7 @@ def mark(
 
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def _mark() -> None:
-        if dotenv:  # pragma: no cover
-            load_dotenv()
+        load_dotenv()
         config = load_config()
 
         connection_string = database or config.database_dsn
@@ -786,7 +777,6 @@ def unmark(
     migration_id: t.Optional[str] = typer.Option(None, "-m", "--migration", help="Specific migration to mark."),
     database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
-    dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -804,8 +794,7 @@ def unmark(
 
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def _unmark() -> None:
-        if dotenv:  # pragma: no cover
-            load_dotenv()
+        load_dotenv()
         config = load_config()
 
         connection_string = database or config.database_dsn
@@ -833,7 +822,6 @@ def migrate_yoyo(
     database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
     skip_files: bool = typer.Option(False, help="Skip file migration, just copy yoyo history."),  # noqa: FBT003
-    dotenv: bool = typer.Option(False, help="Load environment from .env."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -848,8 +836,7 @@ def migrate_yoyo(
 
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def _migrate() -> None:
-        if dotenv:  # pragma: no cover
-            load_dotenv()
+        load_dotenv()
         config = load_config()
         if not skip_files:
             for path in sorted(config.migrations.iterdir()):
