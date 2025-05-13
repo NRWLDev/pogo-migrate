@@ -2,7 +2,7 @@ from unittest import mock
 
 import pytest
 
-from pogo_migrate import context, testing
+from pogo_migrate import testing
 from tests.util import AsyncMock
 
 
@@ -18,7 +18,6 @@ async def test_apply(monkeypatch, db_session, cwd):
     assert testing.migrate.apply.call_args == mock.call(
         db_session,
         cwd / "migrations",
-        logger=context.Context(),
     )
 
 
@@ -31,7 +30,6 @@ async def test_apply_loads_db(monkeypatch, cwd):
     assert testing.migrate.apply.call_args == mock.call(
         mock_session,
         cwd / "migrations",
-        logger=context.Context(),
     )
     assert mock_session.close.call_count == 1
 
@@ -43,7 +41,6 @@ async def test_rollback(monkeypatch, db_session, cwd):
     assert testing.migrate.rollback.call_args == mock.call(
         db_session,
         cwd / "migrations",
-        logger=context.Context(),
     )
 
 
@@ -56,6 +53,5 @@ async def test_rollback_loads_db(monkeypatch, cwd):
     assert testing.migrate.rollback.call_args == mock.call(
         mock_session,
         cwd / "migrations",
-        logger=context.Context(),
     )
     assert mock_session.close.call_count == 1
