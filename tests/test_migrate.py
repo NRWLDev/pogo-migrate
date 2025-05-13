@@ -39,6 +39,7 @@ def _migration_two(migrations, _migration_one):
         f.write("""
 -- second migration
 -- depends: 20240317_01_abcde-initial-migration
+-- transaction: false
 
 -- migrate: apply
 CREATE TABLE table_two();

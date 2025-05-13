@@ -414,12 +414,24 @@ class TestMigration:
         await m.apply(db_session)
         assert m._apply.call_args == mock.call(db_session)
 
+    async def test_apply_not_set(self, db_session):
+        m = migration.Migration("id", Path("20210101_01_rando-commit.sql"), set())
+        m._apply = None
+
+        await m.apply(db_session)
+
     async def test_rollback(self, db_session):
         m = migration.Migration("id", Path("20210101_01_rando-commit.sql"), set())
         m._rollback = AsyncMock()
 
         await m.rollback(db_session)
         assert m._rollback.call_args == mock.call(db_session)
+
+    async def test_rollback_not_set(self, db_session):
+        m = migration.Migration("id", Path("20210101_01_rando-commit.sql"), set())
+        m._rollback = None
+
+        await m.rollback(db_session)
 
     def test_load_sql(self, migration_file_factory):
         mp = migration_file_factory(
