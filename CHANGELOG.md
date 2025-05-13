@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.3.0 (released 2025-05-13)
+
+### Features and Improvements
+
+- **Breaking** Reimplement the apply/rollback interface to better support usage from within python. [[38](https://github.com/NRWLDev/pogo-migrate/issues/38)] [[a9a081e](https://github.com/NRWLDev/pogo-migrate/commit/a9a081ea44b8e3301cb5ca057876985a6482086a)]
+
+### Bug fixes
+
+- Load dotenv by default to remove additional arguments required when running locally. [[e9a2561](https://github.com/NRWLDev/pogo-migrate/commit/e9a2561a4546aff48a9cfefb7cc133e1c0d394e6)]
+
+### Miscellaneous
+
+- Update sqlparse library with EXTENSION support [[37](https://github.com/NRWLDev/pogo-migrate/issues/37)] [[79fe724](https://github.com/NRWLDev/pogo-migrate/commit/79fe724229f682c2d8b1f85f6957856c7840c02c)]
+
 ## v0.2.9 (released 2025-05-05)
 
 ### Documentation
