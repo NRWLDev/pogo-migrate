@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.1 (released 2025-05-14)
+
+### Bug fixes
+
+- Ensure builtin tables are all created in the expected (public) schema. [[40](https://github.com/NRWLDev/pogo-migrate/issues/40)] [[c367270](https://github.com/NRWLDev/pogo-migrate/commit/c367270e5d5a34de67a3fc32bc75316406520aa4)]
+
 ## v0.3.0 (released 2025-05-13)
 
 ### Features and Improvements
