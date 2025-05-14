@@ -96,11 +96,25 @@ def migration_file_factory(migrations):
 
 
 @pytest.fixture(autouse=True)
-async def db_session(postgres_dsn):
+async def db_session(request, postgres_dsn):
     conn = await asyncpg.connect(postgres_dsn)
     tr = conn.transaction()
     await tr.start()
-    await sql.ensure_pogo_sync(conn)
+    if request.node.get_closest_marker("nosync") is None:
+        await sql.ensure_pogo_sync(conn)
+    try:
+        yield conn
+    finally:
+        await tr.rollback()
+        await conn.close()
+
+
+@pytest.fixture(autouse=True)
+async def unit_db_session(postgres_dsn):
+    # Db session with different default schema
+    conn = await asyncpg.connect(postgres_dsn)
+    tr = conn.transaction()
+    await tr.start()
     try:
         yield conn
     finally:

@@ -29,7 +29,7 @@ async def get_applied_migrations(db: asyncpg.Connection) -> set[str]:
     stmt = """
     SELECT
         migration_id
-    FROM _pogo_migration
+    FROM public._pogo_migration
     """
     results = await db.fetch(stmt)
 
@@ -47,7 +47,7 @@ async def ensure_pogo_sync(db: asyncpg.Connection) -> None:
     r = await db.fetchrow(stmt)
     if r is not None and not r["exists"]:
         stmt = """
-        CREATE TABLE _pogo_migration (
+        CREATE TABLE public._pogo_migration (
             migration_hash VARCHAR(64),  -- sha256 hash of the migration id
             migration_id VARCHAR(255),   -- The migration id (ie path basename without extension)
             applied TIMESTAMPTZ,         -- When this id was applied
@@ -57,7 +57,7 @@ async def ensure_pogo_sync(db: asyncpg.Connection) -> None:
         await db.execute(stmt)
 
         stmt = """
-        CREATE TABLE _pogo_version (
+        CREATE TABLE public._pogo_version (
             version INT NOT NULL PRIMARY KEY,
             installed TIMESTAMPTZ
         )
@@ -65,14 +65,14 @@ async def ensure_pogo_sync(db: asyncpg.Connection) -> None:
         await db.execute(stmt)
 
         stmt = """
-        INSERT INTO _pogo_version (version, installed) VALUES (0, now())
+        INSERT INTO public._pogo_version (version, installed) VALUES (0, now())
         """
         await db.execute(stmt)
 
 
 async def migration_applied(db: asyncpg.Connection, migration_id: str, migration_hash: str) -> None:
     stmt = """
-    INSERT INTO _pogo_migration (
+    INSERT INTO public._pogo_migration (
         migration_hash,
         migration_id,
         applied
@@ -85,7 +85,7 @@ async def migration_applied(db: asyncpg.Connection, migration_id: str, migration
 
 async def migration_unapplied(db: asyncpg.Connection, migration_id: str) -> None:
     stmt = """
-    DELETE FROM _pogo_migration
+    DELETE FROM public._pogo_migration
     WHERE migration_id = $1
     """
     await db.execute(stmt, migration_id)
