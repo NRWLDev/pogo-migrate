@@ -17,3 +17,11 @@ postgres, you can build the DSN in config.
 migrations_location = "./migrations"
 database_config = "postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{PORTGRES_DATABASE}"
 ```
+
+If you are using the cli purely to generate new migrations files and running
+them directly via `migrate.apply` the `database_config` configuration can be
+left out.
+
+If any commands are run that require a database connection, and the
+`--database` option is not provided, it will attempt to access the environment
+variable `UNSET_POSTGRES_DSN` and raise an error.

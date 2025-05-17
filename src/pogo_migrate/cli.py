@@ -219,7 +219,7 @@ h: show this help
 
 
 def create_with_editor(config: Config, content: str, extension: str, context: Context) -> Path:
-    editor = get_editor(config)
+    editor = get_editor()
     tmpfile = NamedTemporaryFile(
         mode="w",
         encoding="UTF-8",
@@ -263,7 +263,7 @@ def create_with_editor(config: Config, content: str, extension: str, context: Co
                     message = ""
                     break
 
-        filename = make_file(config, message, extension)
+        filename = make_file(config.migrations, message, extension)
         Path(tmpfile.name).rename(filename)
         return filename
     finally:
@@ -293,7 +293,7 @@ def new(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def new_() -> None:
         load_dotenv()
-        config = load_config()
+        config = load_config(allow_no_database=True)
 
         migrations = await sql.read_migrations(config.migrations, db=None)
         heads = find_heads([m.load() for m in migrations])
@@ -307,7 +307,7 @@ def new(
         extension = ".sql" if not py_ else ".py"
 
         if not interactive:
-            fp = make_file(config, message, extension)
+            fp = make_file(config.migrations, message, extension)
             with fp.open("w", encoding="UTF-8") as f:
                 f.write(content)
             raise typer.Exit(code=0)
@@ -343,7 +343,7 @@ def history(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def history_() -> None:
         load_dotenv()
-        config = load_config()
+        config = load_config(allow_no_database=database is not None)
 
         try:
             connection_string = database or config.database_dsn
@@ -394,7 +394,7 @@ def apply(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def apply_() -> None:
         load_dotenv()
-        config = load_config()
+        config = load_config(allow_no_database=database is not None)
 
         connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
@@ -429,7 +429,7 @@ def rollback(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def rollback_() -> None:
         load_dotenv()
-        config = load_config()
+        config = load_config(allow_no_database=database is not None)
 
         connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
@@ -752,7 +752,7 @@ def mark(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def _mark() -> None:
         load_dotenv()
-        config = load_config()
+        config = load_config(allow_no_database=database is not None)
 
         connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
@@ -795,7 +795,7 @@ def unmark(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def _unmark() -> None:
         load_dotenv()
-        config = load_config()
+        config = load_config(allow_no_database=database is not None)
 
         connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
@@ -837,7 +837,7 @@ def migrate_yoyo(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def _migrate() -> None:
         load_dotenv()
-        config = load_config()
+        config = load_config(allow_no_database=database is not None)
         if not skip_files:
             for path in sorted(config.migrations.iterdir()):
                 if path.name.endswith(".rollback.sql"):

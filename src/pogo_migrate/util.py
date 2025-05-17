@@ -6,8 +6,6 @@ import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pogo_migrate.config import Config
-
 
 def unidecode(s: str) -> str:
     """
@@ -28,22 +26,22 @@ def random_string() -> str:
     return "".join(random.choices(string.digits + string.ascii_lowercase, k=5))  # noqa: S311
 
 
-def make_file(config: Config, message: str, extension: str) -> Path:
+def make_file(migrations_dir: Path, message: str, extension: str) -> Path:
     slug = f"-{slugify(message)}" if message else ""
     datestr = datetime.now(tz=timezone.utc).date().strftime("%Y%m%d")
     rand = random_string()
 
     current = max(
-        [int(p.name[len(datestr) + 1 :].split("_")[0]) for p in Path(config.migrations).glob(f"{datestr}_*")],
+        [int(p.name[len(datestr) + 1 :].split("_")[0]) for p in Path(migrations_dir).glob(f"{datestr}_*")],
         default=0,
     )
 
     number = str(int(current) + 1).zfill(2)
 
-    return config.migrations / f"{datestr}_{number}_{rand}{slug}{extension}"
+    return migrations_dir / f"{datestr}_{number}_{rand}{slug}{extension}"
 
 
-def get_editor(_config: Config) -> str:
+def get_editor() -> str:
     """
     Return the user's preferred visual editor
     """

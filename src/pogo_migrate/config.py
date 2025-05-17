@@ -32,9 +32,17 @@ class Config:
         return self.database_config.format(**format_kwargs)
 
     @classmethod
-    def from_dict(cls: type[Config], data: dict[str, str], root_directory: Path) -> Config:
+    def from_dict(
+        cls: type[Config],
+        data: dict[str, str],
+        root_directory: Path,
+        *,
+        allow_no_database: bool = False,
+    ) -> Config:
         data["root_directory"] = root_directory  # type: ignore[reportArgumentType]
         data["migrations"] = root_directory / data["migrations"]  # type: ignore[reportArgumentType]
+        if allow_no_database and "database_config" not in data:
+            data["database_config"] = "{UNSET_POSTGRES_DSN}"
         return cls(**data)  # type: ignore[reportArgumentType]
 
 
@@ -49,7 +57,7 @@ def find_config() -> Path | None:
     return None
 
 
-def load_config() -> Config:
+def load_config(*, allow_no_database: bool = False) -> Config:
     config = find_config()
     if config is None:
         msg = f"No configuration found, missing {CONFIG_FILENAME}, run 'pogo init ...'"
@@ -62,4 +70,4 @@ def load_config() -> Config:
         msg = "No configuration found, run 'pogo init ...'"
         raise exceptions.InvalidConfigurationError(msg)
 
-    return Config.from_dict(data["tool"]["pogo"], config.parent)
+    return Config.from_dict(data["tool"]["pogo"], config.parent, allow_no_database=allow_no_database)
