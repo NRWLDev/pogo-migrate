@@ -22,6 +22,13 @@ def pyproject(pyproject_factory, migrations):  # noqa: ARG001
     return pyproject_factory()
 
 
+@pytest.fixture
+def pyproject_no_database(pyproject_factory, migrations):  # noqa: ARG001
+    return pyproject_factory({
+        "migrations": "./migrations",
+    })
+
+
 @pytest.fixture(autouse=True)
 def _db_patch(db_session, monkeypatch):
     monkeypatch.setattr(cli.sql.asyncpg, "connect", AsyncMock(return_value=db_session))
@@ -153,6 +160,24 @@ class TestNew:
 
     @pytest.mark.usefixtures("pyproject")
     def test_non_interactive_file_written(self, monkeypatch, cli_runner, cwd):
+        monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
+
+        result = cli_runner.invoke(["new", "--no-interactive"])
+
+        assert result.exit_code == 0, result.output
+        with (cwd / "new_file.py").open() as f:
+            assert f.read() == dedent("""\
+            --
+            -- depends:
+
+            -- migrate: apply
+
+            -- migrate: rollback
+
+            """)
+
+    @pytest.mark.usefixtures("pyproject_no_database")
+    def test_non_interactive_file_written_optional_database(self, monkeypatch, cli_runner, cwd):
         monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
 
         result = cli_runner.invoke(["new", "--no-interactive"])
@@ -543,7 +568,7 @@ class TestHistory:
         )
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    def test_migrations_no_config(self, migration_file_factory, cli_runner):
+    def test_migrations_not_applied(self, migration_file_factory, cli_runner):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -577,9 +602,8 @@ class TestHistory:
             """),
         )
 
-    @pytest.mark.usefixtures("migrations", "pyproject")
-    def test_migrations_not_applied(self, migration_file_factory, cli_runner, monkeypatch):
-        monkeypatch.delenv("POSTGRES_DSN")
+    @pytest.mark.usefixtures("migrations", "pyproject_no_database")
+    def test_migrations_missing_config(self, migration_file_factory, cli_runner):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -607,6 +631,46 @@ class TestHistory:
         cli_runner.assert_output(
             dedent("""\
             Database connection can not be established, migration status can not be determined.
+            STATUS    ID                        FORMAT
+            --------  ------------------------  --------
+            U         20210101_02_rando-commit  sql
+            U         20210101_01_rando-commit  sql
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject_no_database")
+    def test_migrations_missing_config_manual_override(
+        self,
+        migration_file_factory,
+        cli_runner,
+        postgres_dsn,
+    ):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_02_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["history", "-v", "--database", postgres_dsn])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
             STATUS    ID                        FORMAT
             --------  ------------------------  --------
             U         20210101_02_rando-commit  sql
@@ -731,6 +795,82 @@ class TestApply:
 
         assert [r["tablename"] for r in results if not r["tablename"].startswith("_pogo")] == tables
 
+    @pytest.mark.usefixtures("migrations", "pyproject_no_database")
+    async def test_apply_success_missing_config(self, cli_runner, migration_file_factory):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE table_one()
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            CREATE TABLE table_two()
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["apply", "-v"])
+        assert result.exit_code == 1, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Required config `database_config` is not set.
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject_no_database")
+    async def test_apply_success_missing_config_manual_override(
+        self,
+        cli_runner,
+        migration_file_factory,
+        db_session,
+        postgres_dsn,
+    ):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE table_one()
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            CREATE TABLE table_two()
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["apply", "-v", "--database", postgres_dsn])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Applying 20210101_01_rando-commit
+            Applying 20210101_02_rando-commit
+            """),
+        )
+        await self.assert_tables(db_session, ["table_one", "table_two"])
+
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_apply_success(self, cli_runner, migration_file_factory, db_session):
         migration_file_factory(
@@ -847,6 +987,88 @@ class TestRollback:
         results = await db_session.fetch(stmt)
 
         assert [r["tablename"] for r in results if not r["tablename"].startswith("_pogo")] == tables
+
+    @pytest.mark.usefixtures("migrations", "pyproject_no_database")
+    async def test_rollback_missing_configuration(self, cli_runner, migration_file_factory, db_session):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
+        await db_session.execute("create table table_one();create table table_two()")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            DROP TABLE table_one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            DROP TABLE table_two;
+            """),
+        )
+        result = cli_runner.invoke(["rollback", "--count", "-1", "-v"])
+        assert result.exit_code == 1, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Required config `database_config` is not set.
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject_no_database")
+    async def test_rollback_missing_configuration_manual_override(
+        self,
+        cli_runner,
+        migration_file_factory,
+        db_session,
+        postgres_dsn,
+    ):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
+        await db_session.execute("create table table_one();create table table_two()")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            DROP TABLE table_one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            DROP TABLE table_two;
+            """),
+        )
+        result = cli_runner.invoke(["rollback", "--count", "-1", "-v", "--database", postgres_dsn])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Rolling back 20210101_02_rando-commit
+            Rolling back 20210101_01_rando-commit
+            """),
+        )
+        await self.assert_tables(db_session, [])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_rollback_success(self, cli_runner, migration_file_factory, db_session):
@@ -1115,6 +1337,103 @@ class TestMark:
             "",
         )
 
+    @pytest.mark.usefixtures("migrations", "pyproject_no_database")
+    async def test_mark_missing_config(self, cli_runner, migration_file_factory, db_session):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_03_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_02_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["mark"], input="y\nn\n")
+        assert result.exit_code == 1, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Required config `database_config` is not set.
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject_no_database")
+    async def test_mark_missing_config_manual_override(
+        self,
+        cli_runner,
+        migration_file_factory,
+        db_session,
+        postgres_dsn,
+    ):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_03_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_02_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["mark", "--database", postgres_dsn], input="y\nn\n")
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Mark 20210101_02_rando-commit as applied? [y/N]: y
+            Mark 20210101_03_rando-commit as applied? [y/N]: n
+            """),
+        )
+        applied_migrations = await sql.get_applied_migrations(db_session)
+        assert applied_migrations == {"20210101_01_rando-commit", "20210101_02_rando-commit"}
+
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_mark_migrations_applied(self, cli_runner, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
@@ -1266,6 +1585,105 @@ class TestUnMark:
             "",
         )
 
+    @pytest.mark.usefixtures("migrations", "pyproject_no_database")
+    async def test_unmark_missing_config(self, cli_runner, migration_file_factory, db_session):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_03_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_02_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["unmark"], input="y\nn\n")
+        assert result.exit_code == 1, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Required config `database_config` is not set.
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject_no_database")
+    async def test_unmark_missing_config_manual_override(
+        self,
+        cli_runner,
+        migration_file_factory,
+        db_session,
+        postgres_dsn,
+    ):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_03_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_02_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["unmark", "--database", postgres_dsn], input="y\nn\n")
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Unmark 20210101_02_rando-commit as applied? [y/N]: y
+            Unmark 20210101_01_rando-commit as applied? [y/N]: n
+            """),
+        )
+        applied_migrations = await sql.get_applied_migrations(db_session)
+        assert applied_migrations == {"20210101_01_rando-commit"}
+
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_unmark_migrations(self, cli_runner, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
@@ -1405,6 +1823,42 @@ class TestMigrateYoyo:
         cli_runner.assert_output(
             dedent("""\
             skip-files set, ignoring existing migration files.
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject_no_database")
+    async def test_missing_config(self, cli_runner, db_session):
+        await db_session.execute("""
+        create table _yoyo_migration (
+            migration_hash varchar(64),
+            migration_id varchar(255),
+            applied_at_utc timestamp
+        );""")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+
+        result = cli_runner.invoke(["migrate-yoyo", "-v"])
+        assert result.exit_code == 1
+        cli_runner.assert_output(
+            dedent("""\
+            Required config `database_config` is not set.
+            """),
+        )
+
+    @pytest.mark.usefixtures("migrations", "pyproject_no_database")
+    async def test_missing_config_manual_override(self, cli_runner, db_session, postgres_dsn):
+        await db_session.execute("""
+        create table _yoyo_migration (
+            migration_hash varchar(64),
+            migration_id varchar(255),
+            applied_at_utc timestamp
+        );""")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+
+        result = cli_runner.invoke(["migrate-yoyo", "-vvv", "--database", postgres_dsn])
+        assert result.exit_code == 0
+        cli_runner.assert_output(
+            dedent("""\
+            migration history exists, skipping yoyo migration.
             """),
         )
 

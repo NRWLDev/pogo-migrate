@@ -86,6 +86,23 @@ database_config = "{POSTGRES_DSN}"
     )
 
 
+def test_load_config_no_database_config(cwd):
+    p = cwd / "pyproject.toml"
+
+    with p.open("w") as f:
+        f.write("""
+[tool.pogo]
+migrations = "./migrations"
+""")
+    c = config.load_config()
+
+    assert c == config.Config(
+        root_directory=cwd,
+        migrations=cwd / "migrations",
+        database_config=None,
+    )
+
+
 def test_load_config_database_config(cwd):
     p = cwd / "pyproject.toml"
 
@@ -102,6 +119,19 @@ database_config = "{POSTGRES_DSN}"
         migrations=cwd / "migrations",
         database_config="{POSTGRES_DSN}",
     )
+
+
+def test_config_database_config_not_set(cwd):
+    c = config.Config(
+        root_directory=cwd,
+        migrations=cwd / "migrations",
+        database_config=None,
+    )
+
+    with pytest.raises(exceptions.InvalidConfigurationError) as e:
+        c.database_dsn  # noqa: B018
+
+    assert str(e.value) == "Required config `database_config` is not set."
 
 
 def test_config_database_config_dsn_not_set(cwd):

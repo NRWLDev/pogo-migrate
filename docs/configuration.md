@@ -23,5 +23,5 @@ them directly via `migrate.apply` the `database_config` configuration can be
 left out.
 
 If any commands are run that require a database connection, and the
-`--database` option is not provided, it will attempt to access the environment
-variable `UNSET_POGO_DATABASE` and raise an error.
+`--database` option is not provided, it will raise an invalid configuration
+error.

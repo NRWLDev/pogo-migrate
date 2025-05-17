@@ -293,7 +293,7 @@ def new(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def new_() -> None:
         load_dotenv()
-        config = load_config(allow_no_database=True)
+        config = load_config()
 
         migrations = await sql.read_migrations(config.migrations, db=None)
         heads = find_heads([m.load() for m in migrations])
@@ -343,7 +343,7 @@ def history(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def history_() -> None:
         load_dotenv()
-        config = load_config(allow_no_database=database is not None)
+        config = load_config()
 
         try:
             connection_string = database or config.database_dsn
@@ -394,7 +394,7 @@ def apply(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def apply_() -> None:
         load_dotenv()
-        config = load_config(allow_no_database=database is not None)
+        config = load_config()
 
         connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
@@ -429,7 +429,7 @@ def rollback(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def rollback_() -> None:
         load_dotenv()
-        config = load_config(allow_no_database=database is not None)
+        config = load_config()
 
         connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
@@ -752,7 +752,7 @@ def mark(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def _mark() -> None:
         load_dotenv()
-        config = load_config(allow_no_database=database is not None)
+        config = load_config()
 
         connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
@@ -795,7 +795,7 @@ def unmark(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def _unmark() -> None:
         load_dotenv()
-        config = load_config(allow_no_database=database is not None)
+        config = load_config()
 
         connection_string = database or config.database_dsn
         db = await sql.get_connection(connection_string)
@@ -837,7 +837,7 @@ def migrate_yoyo(
     @handle_exceptions(context)  # type: ignore[reportCallIssue]
     async def _migrate() -> None:
         load_dotenv()
-        config = load_config(allow_no_database=database is not None)
+        config = load_config()
         if not skip_files:
             for path in sorted(config.migrations.iterdir()):
                 if path.name.endswith(".rollback.sql"):

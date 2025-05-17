@@ -17,10 +17,13 @@ CONFIG_FILENAME = "pyproject.toml"
 class Config:
     root_directory: Path
     migrations: Path
-    database_config: str
+    database_config: t.Optional[str] = None  # noqa: UP007
 
     @property
     def database_dsn(self: t.Self) -> str:
+        if self.database_config is None:
+            msg = "Required config `database_config` is not set."
+            raise exceptions.InvalidConfigurationError(msg)
         try:
             format_kwargs = {
                 k[1]: os.environ[k[1]] for k in Formatter().parse(self.database_config) if k[1] is not None
@@ -36,13 +39,9 @@ class Config:
         cls: type[Config],
         data: dict[str, str],
         root_directory: Path,
-        *,
-        allow_no_database: bool = False,
     ) -> Config:
         data["root_directory"] = root_directory  # type: ignore[reportArgumentType]
         data["migrations"] = root_directory / data["migrations"]  # type: ignore[reportArgumentType]
-        if allow_no_database and "database_config" not in data:
-            data["database_config"] = "{UNSET_POGO_DATABASE}"
         return cls(**data)  # type: ignore[reportArgumentType]
 
 
@@ -57,7 +56,7 @@ def find_config() -> Path | None:
     return None
 
 
-def load_config(*, allow_no_database: bool = False) -> Config:
+def load_config() -> Config:
     config = find_config()
     if config is None:
         msg = f"No configuration found, missing {CONFIG_FILENAME}, run 'pogo init ...'"
@@ -70,4 +69,4 @@ def load_config(*, allow_no_database: bool = False) -> Config:
         msg = "No configuration found, run 'pogo init ...'"
         raise exceptions.InvalidConfigurationError(msg)
 
-    return Config.from_dict(data["tool"]["pogo"], config.parent, allow_no_database=allow_no_database)
+    return Config.from_dict(data["tool"]["pogo"], config.parent)
