@@ -42,7 +42,7 @@ class Config:
         data["root_directory"] = root_directory  # type: ignore[reportArgumentType]
         data["migrations"] = root_directory / data["migrations"]  # type: ignore[reportArgumentType]
         if allow_no_database and "database_config" not in data:
-            data["database_config"] = "{UNSET_POSTGRES_DSN}"
+            data["database_config"] = "{UNSET_POGO_DATABASE}"
         return cls(**data)  # type: ignore[reportArgumentType]
 
 

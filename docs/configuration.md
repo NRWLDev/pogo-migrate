@@ -24,4 +24,4 @@ left out.
 
 If any commands are run that require a database connection, and the
 `--database` option is not provided, it will attempt to access the environment
-variable `UNSET_POSTGRES_DSN` and raise an error.
+variable `UNSET_POGO_DATABASE` and raise an error.
