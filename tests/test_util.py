@@ -42,7 +42,7 @@ def test_random_string():
 
 def test_make_file(config, monkeypatch):
     monkeypatch.setattr(util.random, "choices", mock.Mock(return_value="rando"))
-    p = util.make_file(config, "a message", ".sql")
+    p = util.make_file(config.migrations, "a message", ".sql")
     datestr = datetime.now(tz=timezone.utc).date().strftime("%Y%m%d")
 
     assert p.stem == f"{datestr}_01_rando-a-message"
@@ -55,7 +55,7 @@ def test_make_file_increments_counter(monkeypatch, config, migrations):
     datestr = datetime.now(tz=timezone.utc).date().strftime("%Y%m%d")
 
     for i in range(10):
-        p = util.make_file(config, "a message", ".sql")
+        p = util.make_file(config.migrations, "a message", ".sql")
         p.touch()
         assert p.stem == f"{datestr}_{str(i + 1).zfill(2)}_rando-a-message"
 
@@ -68,10 +68,10 @@ def test_make_file_increments_counter(monkeypatch, config, migrations):
         (None, None, "vi"),
     ],
 )
-def test_get_editor(envkey, envval, expected, monkeypatch, config):
+def test_get_editor(envkey, envval, expected, monkeypatch):
     monkeypatch.delenv("VISUAL", raising=False)
     monkeypatch.delenv("EDITOR", raising=False)
     if envkey:
         monkeypatch.setenv(envkey, envval)
 
-    assert util.get_editor(config) == expected
+    assert util.get_editor() == expected

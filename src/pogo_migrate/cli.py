@@ -219,7 +219,7 @@ h: show this help
 
 
 def create_with_editor(config: Config, content: str, extension: str, context: Context) -> Path:
-    editor = get_editor(config)
+    editor = get_editor()
     tmpfile = NamedTemporaryFile(
         mode="w",
         encoding="UTF-8",
@@ -263,7 +263,7 @@ def create_with_editor(config: Config, content: str, extension: str, context: Co
                     message = ""
                     break
 
-        filename = make_file(config, message, extension)
+        filename = make_file(config.migrations, message, extension)
         Path(tmpfile.name).rename(filename)
         return filename
     finally:
@@ -307,7 +307,7 @@ def new(
         extension = ".sql" if not py_ else ".py"
 
         if not interactive:
-            fp = make_file(config, message, extension)
+            fp = make_file(config.migrations, message, extension)
             with fp.open("w", encoding="UTF-8") as f:
                 f.write(content)
             raise typer.Exit(code=0)

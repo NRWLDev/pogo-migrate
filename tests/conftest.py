@@ -55,7 +55,11 @@ def cwd(tmp_path):
 
 @pytest.fixture
 def pyproject_factory(cwd):
-    def factory():
+    def factory(configuration=None):
+        configuration = configuration or {
+            "migrations": "./migrations",
+            "database_config": "{POSTGRES_DSN}",
+        }
         p = cwd / "pyproject.toml"
 
         with p.open("w") as f:
@@ -63,10 +67,7 @@ def pyproject_factory(cwd):
                 rtoml.dumps(
                     {
                         "tool": {
-                            "pogo": {
-                                "migrations": "./migrations",
-                                "database_config": "{POSTGRES_DSN}",
-                            },
+                            "pogo": configuration,
                         },
                     },
                 ),
