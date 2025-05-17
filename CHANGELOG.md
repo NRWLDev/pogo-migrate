@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.2 (released 2025-05-17)
+
+### Features and Improvements
+
+- Support optional database_config configuration for pure in code usage. [[42](https://github.com/NRWLDev/pogo-migrate/issues/42)] [[9f52823](https://github.com/NRWLDev/pogo-migrate/commit/9f52823140851c01c86abcf8dce53f77f2ca209d)]
+
 ## v0.3.1 (released 2025-05-14)
 
 ### Bug fixes
