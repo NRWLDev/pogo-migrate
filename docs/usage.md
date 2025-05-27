@@ -12,7 +12,8 @@ Supported flags:
 - `-d, --database-env-key` defines the environment variable (or template to
   build from environment variables) for the database dsn. See
   [configuration](https://nrwldev.github.io/pogo-migrate/configuration/) for
-  examples.
+  examples. For setups running migrations purely in code, this configuration
+  can be omitted.
 
 ### Migrating from yoyo
 
@@ -138,7 +139,7 @@ live databases have been updated.
 Supported flags:
 
 - `-m, --migrations-location` defines the name of the migrations folder
-  (defaults to `./migrations`)
+  (defaults to configured location)
 - `--backup` keep any removed files with `.bak` suffix.
 
 ### Squashing migrations
@@ -158,7 +159,7 @@ grouped first.
 Supported flags:
 
 - `-m, --migrations-location` defines the name of the migrations folder
-  (defaults to `./migrations`)
+  (defaults to configured location)
 - `--backup` keep any removed files with `.bak` suffix.
 - `--source` add a comment to each extracted statement with the source
   migration id.
@@ -178,7 +179,7 @@ commands.
 Supported flags:
 
 - `-m, --migrations-location` defines the name of the migrations folder
-  (defaults to `./migrations`)
+  (defaults to configured location)
 
 ## Validate migration sql
 
@@ -189,7 +190,7 @@ using reserved keywords as table names without quoting etc.
 Supported flags:
 
 - `-m, --migrations-location` defines the name of the migrations folder
-  (defaults to `./migrations`)
+  (defaults to configured location)
 
 ## Usage in python
 
