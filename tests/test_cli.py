@@ -2402,6 +2402,88 @@ class TestSquash:
             "20210102_01_abcd-fifth-migration",
         ]
 
+    def test_squash_exclusions_honoured(self, migration_file_factory, cli_runner, migrations, pyproject_factory):
+        pyproject_factory({
+            "migrations": "./migrations",
+            "squash": {"exclude": ["20210101_03_ijkl-third-migration"]},
+        })
+        migration_file_factory(
+            "20210101_01_abcd-first-migration",
+            "sql",
+            dedent("""
+            -- first migration
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE one (id INT);
+
+            -- migrate: rollback
+            DROP TABLE one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_efgh-second-migration",
+            "sql",
+            dedent("""
+            -- second migration
+            -- depends: 20210101_01_abcd-first-migration
+
+            -- migrate: apply
+            CREATE TABLE two();
+
+            -- migrate: rollback
+            DROP TABLE two;
+            """),
+        )
+        migration_file_factory(
+            "20210101_03_ijkl-third-migration",
+            "sql",
+            dedent("""
+            -- third migration
+            -- depends: 20210101_02_efgh-second-migration
+
+            -- migrate: apply
+            CREATE TABLE three (id INT);
+            -- migrate: rollback
+            DROP TABLE three;
+            """),
+        )
+        migration_file_factory(
+            "20210101_04_mnop-fourth-migration",
+            "sql",
+            dedent("""
+            -- fourth migration
+            -- depends: 20210101_03_ijkl-third-migration
+
+            -- migrate: apply
+            CREATE TABLE four (id INT);
+            -- migrate: rollback
+            DROP TABLE four;
+            """),
+        )
+        migration_file_factory(
+            "20210102_01_abcd-fifth-migration",
+            "sql",
+            dedent("""
+            -- fifth migration
+            -- depends: 20210101_04_mnop-fourth-migration
+
+            -- migrate: apply
+            CREATE TABLE five (id INT);
+            -- migrate: rollback
+            DROP TABLE five;
+            """),
+        )
+
+        result = cli_runner.invoke(["squash"])
+        assert result.exit_code == 0, result.output
+
+        assert sorted([path.stem for path in migrations.iterdir() if path.suffix in {".py", ".sql"}]) == [
+            "20210101_02_efgh-second-migration",
+            "20210101_03_ijkl-third-migration",
+            "20210102_01_abcd-fifth-migration",
+        ]
+
     def test_skip_initial_file(self, migration_file_factory, cli_runner, migrations):
         migration_file_factory(
             "20210101_01_abcd-first-migration",

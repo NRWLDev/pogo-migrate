@@ -527,6 +527,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
     depends = None
     latest = None
     for idx, migration in enumerate(migrations):
+        skip = migration.id in config.squash.exclude
         if not migration.is_sql or not migration.use_transaction:
             if prompt_skip:
                 view = typer.confirm(f"View unsquashable migration {migration.id}", default=True)
@@ -544,7 +545,9 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
 
                     latest = migration
                     continue
+            skip = True
 
+        if skip:
             if (applies or rollbacks) and latest:
                 new = squash.write(applies, rollbacks, latest, depends, squashed)
                 replaced[latest.id]["new"] = new
