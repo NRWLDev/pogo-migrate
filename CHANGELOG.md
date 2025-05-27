@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.3.3 (released 2025-05-27)
+
+### Features and Improvements
+
+- Add configuration support for excluding specific migrations from the squash command. [[46](https://github.com/NRWLDev/pogo-migrate/issues/46)] [[14156d3](https://github.com/NRWLDev/pogo-migrate/commit/14156d32d86fea325377fd7bc8a1541d9e0cd3fc)]
+
+### Bug fixes
+
+- Add support for TRIGGER statements in squash. [[44](https://github.com/NRWLDev/pogo-migrate/issues/44)] [[c831d5f](https://github.com/NRWLDev/pogo-migrate/commit/c831d5f6b2752545e20cc0710f3b49b55382a63d)]
+- Read migrations dir from config, continue to support manual override in squash, remove, and validate. [[45](https://github.com/NRWLDev/pogo-migrate/issues/45)] [[0101a65](https://github.com/NRWLDev/pogo-migrate/commit/0101a65aa3584d28f2307fdb5b477a840580a884)]
+
 ## v0.3.2 (released 2025-05-17)
 
 ### Features and Improvements
