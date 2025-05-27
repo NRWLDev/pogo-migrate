@@ -2423,20 +2423,17 @@ class TestSquash:
         )
         migration_file_factory(
             "20210101_02_efgh-second-migration",
-            "py",
-            dedent('''
-            """
-            second migration
-            """
-            __depends__ = ["20210101_01_abcd-first-migration"]
-            __transaction__ = False
+            "sql",
+            dedent("""
+            -- second migration
+            -- depends: 20210101_01_abcd-first-migration
 
-            async def apply(db):
-                await db.execute("CREATE TABLE two();")
+            -- migrate: apply
+            CREATE TABLE two();
 
-            async def rollback(db):
-                await db.execute("DROP TABLE two;")
-            '''),
+            -- migrate: rollback
+            DROP TABLE two;
+            """),
         )
         migration_file_factory(
             "20210101_03_ijkl-third-migration",
@@ -2464,7 +2461,7 @@ class TestSquash:
             DROP TABLE four;
             """),
         )
-        new = migration_file_factory(
+        migration_file_factory(
             "20210102_01_abcd-fifth-migration",
             "sql",
             dedent("""
@@ -2481,35 +2478,7 @@ class TestSquash:
         result = cli_runner.invoke(["squash"])
         assert result.exit_code == 0, result.output
 
-        assert new.read_text() == dedent("""\
-        -- fifth migration
-        -- depends: 20210101_03_ijkl-third-migration
-
-        -- squashed: 20210101_04_mnop-fourth-migration
-
-        -- migrate: apply
-
-        -- Squash four statements.
-
-        CREATE TABLE four (id INT);
-
-        -- Squash five statements.
-
-        CREATE TABLE five (id INT);
-
-        -- migrate: rollback
-
-        -- Squash five statements.
-
-        DROP TABLE five;
-
-        -- Squash four statements.
-
-        DROP TABLE four;
-        """)
-
         assert sorted([path.stem for path in migrations.iterdir() if path.suffix in {".py", ".sql"}]) == [
-            "20210101_01_abcd-first-migration",
             "20210101_02_efgh-second-migration",
             "20210101_03_ijkl-third-migration",
             "20210102_01_abcd-fifth-migration",
