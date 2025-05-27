@@ -119,7 +119,7 @@ def parse(context: Context, statement: str) -> ParsedStatement:
     type_ = parsed.get_type()
 
     identifier = None
-    if type_ in ("CREATE", "ALTER", "DROP"):
+    if type_ in ("CREATE", "ALTER", "DROP", "CREATE OR REPLACE"):
         idx, action = parsed.token_next_by(
             m=[
                 (sqlparse.tokens.Keyword, "TABLE"),
@@ -127,6 +127,7 @@ def parse(context: Context, statement: str) -> ParsedStatement:
                 (sqlparse.tokens.Keyword, "INDEX"),
                 (sqlparse.tokens.Keyword, "SCHEMA"),
                 (sqlparse.tokens.Keyword, "EXTENSION"),
+                (sqlparse.tokens.Keyword, "TRIGGER"),
             ],
         )
 
