@@ -162,3 +162,10 @@ convention = "google"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pogo]
+migrations = './migrations'
+database_config = '{POGO_DATABASE}'
+
+[tool.pogo.squash]
+exclude = ["a"]

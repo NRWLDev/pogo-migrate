@@ -121,6 +121,27 @@ database_config = "{POSTGRES_DSN}"
     )
 
 
+def test_load_config_with_squash_configuration(cwd):
+    p = cwd / "pyproject.toml"
+
+    with p.open("w") as f:
+        f.write("""
+[tool.pogo]
+migrations = "./migrations"
+database_config = "{POSTGRES_DSN}"
+[tool.pogo.squash]
+exclude = ["a"]
+""")
+    c = config.load_config()
+
+    assert c == config.Config(
+        root_directory=cwd,
+        migrations=cwd / "migrations",
+        database_config="{POSTGRES_DSN}",
+        squash=config.Squash(exclude=["a"]),
+    )
+
+
 def test_config_database_config_not_set(cwd):
     c = config.Config(
         root_directory=cwd,

@@ -14,10 +14,16 @@ CONFIG_FILENAME = "pyproject.toml"
 
 
 @dataclasses.dataclass
+class Squash:
+    exclude: list[str] = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass
 class Config:
     root_directory: Path
     migrations: Path
-    database_config: t.Optional[str] = None  # noqa: UP007
+    squash: Squash = dataclasses.field(default_factory=Squash)
+    database_config: str | None = None
 
     @property
     def database_dsn(self: t.Self) -> str:
@@ -37,12 +43,14 @@ class Config:
     @classmethod
     def from_dict(
         cls: type[Config],
-        data: dict[str, str],
+        data: dict[str, t.Any],
         root_directory: Path,
     ) -> Config:
-        data["root_directory"] = root_directory  # type: ignore[reportArgumentType]
-        data["migrations"] = root_directory / data["migrations"]  # type: ignore[reportArgumentType]
-        return cls(**data)  # type: ignore[reportArgumentType]
+        data["root_directory"] = root_directory
+        data["migrations"] = root_directory / str(data["migrations"])
+        if "squash" in data:
+            data["squash"] = Squash(**data["squash"])
+        return cls(**data)
 
 
 def find_config() -> Path | None:

@@ -25,3 +25,14 @@ left out.
 If any commands are run that require a database connection, and the
 `--database` option is not provided, it will raise an invalid configuration
 error.
+
+## Squash migration exclusions
+
+Some migrations can not be squashed due to complexity, or you might just want
+to keep them stand alone. Additional configuration can be added to exclude
+specific migrations from being included when `pogo squash` is run.
+
+```toml
+[tool.pogo.squash]
+exclude = ["migration-id-1", "migration-id-5"]
+```
