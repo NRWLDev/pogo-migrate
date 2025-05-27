@@ -1959,6 +1959,7 @@ class TestMigrateYoyo:
         )
 
 
+@pytest.mark.usefixtures("pyproject")
 class TestRemove:
     def test_migration_removed_from_chain(self, migration_file_factory, cli_runner):
         migration_file_factory(
@@ -2020,6 +2021,7 @@ class TestRemove:
         assert Path(f"{mp}.bak").exists() is True
 
 
+@pytest.mark.usefixtures("pyproject")
 class TestClean:
     def test_bak_files_removed(self, migration_file_factory, cli_runner):
         b1 = migration_file_factory(
@@ -2064,6 +2066,7 @@ class TestClean:
         assert mp.exists() is True
 
 
+@pytest.mark.usefixtures("pyproject")
 class TestSquash:
     def test_simple_squash_all_sql(self, migration_file_factory, cli_runner):
         old = migration_file_factory(

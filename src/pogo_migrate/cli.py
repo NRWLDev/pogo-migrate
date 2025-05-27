@@ -442,7 +442,7 @@ def rollback(
 @app.command("remove")
 def remove(
     migration_id: str = typer.Argument(show_default=False, help="Migration id to remove (message can be excluded)."),
-    migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
+    migrations_location: t.Optional[str] = typer.Option(None, "-m", "--migrations-location"),
     *,
     backup: bool = typer.Option(False, "--backup/ ", help="Keep .bak copy of original files."),  # noqa: FBT003
     verbose: int = typer.Option(
@@ -456,6 +456,10 @@ def remove(
 ) -> None:
     """Remove a migration from the dependency chain."""
     context = Context(verbose)
+
+    load_dotenv()
+    config = load_config()
+    migrations_location = migrations_location or str(config.migrations)
 
     migrations = [
         Migration(path.stem, path, set())
@@ -474,7 +478,7 @@ def remove(
 
 @app.command("squash")
 def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
-    migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
+    migrations_location: t.Optional[str] = typer.Option(None, "-m", "--migrations-location"),
     *,
     backup: bool = typer.Option(False, "--backup/ ", help="Keep .bak copy of original files."),  # noqa: FBT003
     source: bool = typer.Option(False, "--source/ ", help="Add comment for source migration to each statement."),  # noqa: FBT003
@@ -504,6 +508,10 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
     grouped first.
     """
     context = Context(verbose)
+
+    load_dotenv()
+    config = load_config()
+    migrations_location = migrations_location or str(config.migrations)
 
     migrations = [
         Migration(path.stem, path, set())
@@ -637,7 +645,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
 
 @app.command("clean")
 def clean(
-    migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
+    migrations_location: t.Optional[str] = typer.Option(None, "-m", "--migrations-location"),
     *,
     verbose: int = typer.Option(
         0,
@@ -650,6 +658,9 @@ def clean(
 ) -> None:
     """Clean the migration directory of .bak migrations from squash."""
     _context = Context(verbose)
+    load_dotenv()
+    config = load_config()
+    migrations_location = migrations_location or str(config.migrations)
 
     for path in Path(migrations_location).iterdir():
         if path.suffix in {".bak"}:
@@ -658,7 +669,7 @@ def clean(
 
 @app.command("validate")
 def validate(
-    migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
+    migrations_location: t.Optional[str] = typer.Option(None, "-m", "--migrations-location"),
     *,
     verbose: int = typer.Option(
         0,
@@ -674,6 +685,9 @@ def validate(
     Best effort pass through to make sure identifiers aren't keywords.
     """
     context = Context(verbose)
+    load_dotenv()
+    config = load_config()
+    migrations_location = migrations_location or str(config.migrations)
 
     migrations = [
         Migration(path.stem, path, set())
