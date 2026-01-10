@@ -525,7 +525,7 @@ class TestMigration:
 
         assert (
             str(e.value)
-            == "Could not import migration from '20210101_01_rando-migration-message.csv': ModuleSpec has no loader attached"
+            == "Could not import migration from '20210101_01_rando-migration-message.csv': ModuleSpec not found"
         )
 
     def test_load_invalid_dependency(self, migration_file_factory):

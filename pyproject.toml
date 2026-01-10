@@ -10,7 +10,7 @@ maintainers = [
     {name = "Daniel Edgecombe", email = "daniel@nrwl.co"},
 ]
 license = "Apache-2.0"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 keywords = ["migrations", "migrate", "database", "asyncpg", "yoyo"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -30,6 +30,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "pogo-core >= 0.1.0",
     "typer-slim >= 0",
     "rtoml >= 0.10",
     "sqlparse >= 0.5.2",
