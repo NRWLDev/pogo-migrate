@@ -9,11 +9,11 @@ import nest_asyncio
 import pytest
 import rtoml
 import typer.testing
+from pogo_core.migration import Migration
+from pogo_core.util import sql
 
 import pogo_migrate.cli
-from pogo_migrate import sql
 from pogo_migrate.context import Context
-from pogo_migrate.migration import Migration
 
 
 @pytest.fixture(autouse=True, scope="session")

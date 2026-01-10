@@ -4,8 +4,9 @@ from textwrap import dedent
 from unittest import mock
 
 import pytest
+from pogo_core.util import sql
 
-from pogo_migrate import cli, sql
+from pogo_migrate import cli
 from tests.util import AsyncMock
 
 
@@ -31,7 +32,7 @@ def pyproject_no_database(pyproject_factory, migrations):  # noqa: ARG001
 
 @pytest.fixture(autouse=True)
 def _db_patch(db_session, monkeypatch):
-    monkeypatch.setattr(cli.sql.asyncpg, "connect", AsyncMock(return_value=db_session))
+    monkeypatch.setattr(sql.asyncpg, "connect", AsyncMock(return_value=db_session))
 
 
 class TestInit:
