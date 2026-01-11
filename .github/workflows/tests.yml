@@ -71,7 +71,7 @@ jobs:
         version: ["3.9.x", "3.10.x", "3.11.x", "3.12.x"]
 
     steps:
-    - uses: ikalnytskyi/action-setup-postgres@v6
+    - uses: ikalnytskyi/action-setup-postgres@v8
       with:
         username: unit
         password: password

@@ -1,6 +1,7 @@
 from unittest import mock
 
 import pytest
+from pogo_core.util import testing as core_testing
 
 from pogo_migrate import testing
 from tests.util import AsyncMock
@@ -12,22 +13,22 @@ def pyproject(pyproject_factory):
 
 
 async def test_apply(monkeypatch, db_session, cwd):
-    monkeypatch.setattr(testing.migrate, "apply", AsyncMock())
+    monkeypatch.setattr(core_testing.migrate, "apply", AsyncMock())
     await testing.apply(db_session)
 
-    assert testing.migrate.apply.call_args == mock.call(
+    assert core_testing.migrate.apply.call_args == mock.call(
         db_session,
         cwd / "migrations",
     )
 
 
 async def test_apply_loads_db(monkeypatch, cwd):
-    monkeypatch.setattr(testing.migrate, "apply", AsyncMock())
+    monkeypatch.setattr(core_testing.migrate, "apply", AsyncMock())
     mock_session = mock.Mock(close=AsyncMock(return_value=None))
-    monkeypatch.setattr(testing.sql, "get_connection", AsyncMock(return_value=mock_session))
+    monkeypatch.setattr(core_testing.sql, "get_connection", AsyncMock(return_value=mock_session))
     await testing.apply()
 
-    assert testing.migrate.apply.call_args == mock.call(
+    assert core_testing.migrate.apply.call_args == mock.call(
         mock_session,
         cwd / "migrations",
     )
@@ -35,22 +36,22 @@ async def test_apply_loads_db(monkeypatch, cwd):
 
 
 async def test_rollback(monkeypatch, db_session, cwd):
-    monkeypatch.setattr(testing.migrate, "rollback", AsyncMock())
+    monkeypatch.setattr(core_testing.migrate, "rollback", AsyncMock())
     await testing.rollback(db_session)
 
-    assert testing.migrate.rollback.call_args == mock.call(
+    assert core_testing.migrate.rollback.call_args == mock.call(
         db_session,
         cwd / "migrations",
     )
 
 
 async def test_rollback_loads_db(monkeypatch, cwd):
-    monkeypatch.setattr(testing.migrate, "rollback", AsyncMock())
+    monkeypatch.setattr(core_testing.migrate, "rollback", AsyncMock())
     mock_session = mock.Mock(close=AsyncMock(return_value=None))
-    monkeypatch.setattr(testing.sql, "get_connection", AsyncMock(return_value=mock_session))
+    monkeypatch.setattr(core_testing.sql, "get_connection", AsyncMock(return_value=mock_session))
     await testing.rollback()
 
-    assert testing.migrate.rollback.call_args == mock.call(
+    assert core_testing.migrate.rollback.call_args == mock.call(
         mock_session,
         cwd / "migrations",
     )

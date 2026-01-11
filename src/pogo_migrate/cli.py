@@ -18,11 +18,13 @@ import dotenv
 import rtoml
 import tabulate
 import typer
+from pogo_core import squash
+from pogo_core.migration import Migration, find_heads, read_sql_migration, topological_sort
+from pogo_core.util import migrate, sql
 
-from pogo_migrate import exceptions, migrate, sql, squash, yoyo
+from pogo_migrate import exceptions, yoyo
 from pogo_migrate.config import Config, load_config
 from pogo_migrate.context import Context
-from pogo_migrate.migration import Migration, find_heads, read_sql_migration, topological_sort
 from pogo_migrate.util import get_editor, make_file
 
 if sys.version_info < (3, 10):
@@ -473,7 +475,7 @@ def remove(
             with contextlib.suppress(IndexError):
                 next_migration = migrations[i + 1]
 
-            squash.remove(context, migration, next_migration, backup=backup)
+            squash.remove(migration, next_migration, logger=context, backup=backup)
 
 
 @app.command("squash")
@@ -541,7 +543,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                     with contextlib.suppress(IndexError):
                         next_migration = migrations[idx + 1]
 
-                    squash.remove(context, migration, next_migration, backup=backup)
+                    squash.remove(migration, next_migration, logger=context, backup=backup)
 
                     latest = migration
                     continue
@@ -569,7 +571,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         _, _, _, _, _, apply_statements, rollback_statements = read_sql_migration(migration.path)
         for i, apply in enumerate(apply_statements):
             try:
-                parsed = squash.parse_sqlglot(context, apply)
+                parsed = squash.parse_sqlglot(apply, logger=context)
             except squash.ParseError as e:
                 context.stacktrace()
                 context.error("%s: %s", migration.id, str(e))
@@ -605,7 +607,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         rollbacks_ = defaultdict(list)
         for rollback in reversed(rollback_statements):
             try:
-                parsed = squash.parse_sqlglot(context, rollback)
+                parsed = squash.parse_sqlglot(rollback, logger=context)
             except squash.ParseError as e:
                 context.stacktrace()
                 context.error("%s: %s", migration.id, str(e))
@@ -730,7 +732,7 @@ def validate(
 
         for statement in statements:
             try:
-                parsed = squash.parse_sqlglot(context, statement)
+                parsed = squash.parse_sqlglot(statement, logger=context)
             except squash.ParseError as e:
                 context.stacktrace()
                 context.error("%s: %s", migration.id, str(e))

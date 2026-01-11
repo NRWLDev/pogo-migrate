@@ -1,4 +1,7 @@
+from unittest import mock
+
 import pytest
+from pogo_core.util import sql as sql_core
 
 from pogo_migrate import sql
 
@@ -63,3 +66,15 @@ async def test_migration_unapplied(db_session, schema):
 
     ids = await sql.get_applied_migrations(db_session)
     assert ids == set()
+
+
+async def test_get_connection(db_session, monkeypatch):
+    monkeypatch.setattr(sql_core.asyncpg, "connect", mock.AsyncMock(return_value=db_session))
+    db = await sql.get_connection("connection-string")
+
+    assert db == db_session
+
+
+async def test_read_migrations(db_session, cwd):
+    migrations = await sql.read_migrations(cwd, db_session)
+    assert migrations == []

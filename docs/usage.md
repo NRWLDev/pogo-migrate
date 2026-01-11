@@ -223,3 +223,23 @@ conn = await asyncpg.connect(postgres_dsn)
 await migrate.apply(db=conn, migrations_dir=c.migrations)
 await migrate.rollback(db=conn, migrations_dir=c.migrations)
 ```
+
+### Core
+
+In the case you want to manage migrations outside of development and don't want
+to install all the interface dependencies, `pogo-core` package provides the
+underlying supporting code.
+
+```python
+from pathlib import Path
+
+from pogo_core.util import migrate, sql
+
+migrations_dir = Path("path/to/migrations")
+conn = await sql.get_connection(database_dsn)
+
+await migrate.apply(db=conn, migrations_dir=migrations_dir)
+await migrate.rollback(db=conn, migrations_dir=migrations_dir)
+```
+
+An optional `logger` parameter can be provided to override the internal logger in both `apply()` and `rollback()`.
