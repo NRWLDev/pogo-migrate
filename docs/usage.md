@@ -108,6 +108,24 @@ unmark` will mark a migration as unapplied.
   `--no-dotenv`)
 - `--schema` override default schema for migrations being rolled back.
 
+## Multiple schemas
+
+If you have multiple projects with their own migrations that you wish to manage
+in a single database with separate migrations per project. Configure each
+project with the desired schema, and apply migrations as normal. The
+configuration will ensure they are run in the correct schema.
+
+If you have a single project with migrations that you wish to manage in
+multiple schemas, use the `--schema` override flag.
+
+For example:
+
+```bash
+$ pogo apply --schema companya
+$ pogo apply --schema companyb
+$ pogo rollback --count -1 --schema companyb
+```
+
 ## View migration status
 
 `pogo history` will list available migrations. Each migration will be prefixed
