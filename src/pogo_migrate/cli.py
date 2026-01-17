@@ -13,6 +13,7 @@ from collections import defaultdict
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from textwrap import dedent
+from typing import ParamSpec
 
 import dotenv
 import rtoml
@@ -26,11 +27,6 @@ from pogo_migrate import exceptions, yoyo
 from pogo_migrate.config import Config, load_config
 from pogo_migrate.context import Context
 from pogo_migrate.util import get_editor, make_file
-
-if sys.version_info < (3, 10):
-    from typing_extensions import ParamSpec
-else:  # pragma: no cover
-    from typing import ParamSpec
 
 tempfile_prefix = "_tmp_pogonew"
 
@@ -51,7 +47,7 @@ def _version_callback(*, value: bool) -> None:
 
 
 def _callback(  # pragma: no cover
-    _version: t.Optional[bool] = typer.Option(
+    _version: bool | None = typer.Option(  # noqa: FBT001
         None,
         "-v",
         "--version",
@@ -224,7 +220,7 @@ h: show this help
 
 def create_with_editor(config: Config, content: str, extension: str, context: Context) -> Path:
     editor = get_editor()
-    tmpfile = NamedTemporaryFile(
+    tmpfile = NamedTemporaryFile(  # noqa: SIM115
         mode="w",
         encoding="UTF-8",
         dir=config.migrations,
@@ -324,7 +320,7 @@ def new(
 
 @app.command("history")
 def history(
-    database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
+    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
     schema: str | None = typer.Option(None, help="Schema override."),
     unapplied: bool = typer.Option(False, help="Show only unapplied migrations."),  # noqa: FBT003
@@ -383,7 +379,7 @@ def history(
 
 @app.command("apply")
 def apply(
-    database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
+    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
     schema: str | None = typer.Option(None, help="Schema override."),
     verbose: int = typer.Option(
@@ -414,7 +410,7 @@ def apply(
 
 @app.command("rollback")
 def rollback(
-    database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
+    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     count: int = typer.Option(
         1,
         "-c",
@@ -458,7 +454,7 @@ def rollback(
 @app.command("remove")
 def remove(
     migration_id: str = typer.Argument(show_default=False, help="Migration id to remove (message can be excluded)."),
-    migrations_location: t.Optional[str] = typer.Option(None, "-m", "--migrations-location"),
+    migrations_location: str | None = typer.Option(None, "-m", "--migrations-location"),
     *,
     backup: bool = typer.Option(False, "--backup/ ", help="Keep .bak copy of original files."),  # noqa: FBT003
     verbose: int = typer.Option(
@@ -494,7 +490,7 @@ def remove(
 
 @app.command("squash")
 def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
-    migrations_location: t.Optional[str] = typer.Option(None, "-m", "--migrations-location"),
+    migrations_location: str | None = typer.Option(None, "-m", "--migrations-location"),
     *,
     backup: bool = typer.Option(False, "--backup/ ", help="Keep .bak copy of original files."),  # noqa: FBT003
     source: bool = typer.Option(False, "--source/ ", help="Add comment for source migration to each statement."),  # noqa: FBT003
@@ -664,7 +660,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
 
 @app.command("clean")
 def clean(
-    migrations_location: t.Optional[str] = typer.Option(None, "-m", "--migrations-location"),
+    migrations_location: str | None = typer.Option(None, "-m", "--migrations-location"),
     *,
     verbose: int = typer.Option(
         0,
@@ -688,7 +684,7 @@ def clean(
 
 @app.command("validate")
 def validate(
-    migrations_location: t.Optional[str] = typer.Option(None, "-m", "--migrations-location"),
+    migrations_location: str | None = typer.Option(None, "-m", "--migrations-location"),
     *,
     verbose: int = typer.Option(
         0,
@@ -717,7 +713,7 @@ def validate(
 
     for migration in migrations:
         if not migration.is_sql:
-            from unittest import mock
+            from unittest import mock  # noqa: PLC0415
 
             mock_asyncpg = mock.Mock()
             mock_asyncpg.execute = mock.AsyncMock(return_value=None)
@@ -763,8 +759,8 @@ def validate(
 
 @app.command("mark")
 def mark(
-    migration_id: t.Optional[str] = typer.Option(None, "-m", "--migration", help="Specific migration to mark."),
-    database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
+    migration_id: str | None = typer.Option(None, "-m", "--migration", help="Specific migration to mark."),
+    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
     schema: str | None = typer.Option(None, help="Schema override."),
     interactive: bool = typer.Option(True, help="Confirm all changes."),  # noqa: FBT003
@@ -809,8 +805,8 @@ def mark(
 
 @app.command("unmark")
 def unmark(
-    migration_id: t.Optional[str] = typer.Option(None, "-m", "--migration", help="Specific migration to mark."),
-    database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
+    migration_id: str | None = typer.Option(None, "-m", "--migration", help="Specific migration to mark."),
+    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
     schema: str | None = typer.Option(None, help="Schema override."),
     verbose: int = typer.Option(
@@ -856,7 +852,7 @@ def unmark(
 
 @app.command("migrate-yoyo")
 def migrate_yoyo(
-    database: t.Optional[str] = typer.Option(None, "-d", "--database", help="Database connection string."),
+    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
     skip_files: bool = typer.Option(False, help="Skip file migration, just copy yoyo history."),  # noqa: FBT003
     verbose: int = typer.Option(
