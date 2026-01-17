@@ -25,9 +25,11 @@ def pyproject(pyproject_factory, migrations):  # noqa: ARG001
 
 @pytest.fixture
 def pyproject_no_database(pyproject_factory, migrations):  # noqa: ARG001
-    return pyproject_factory({
-        "migrations": "./migrations",
-    })
+    return pyproject_factory(
+        {
+            "migrations": "./migrations",
+        },
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -2404,10 +2406,12 @@ class TestSquash:
         ]
 
     def test_squash_exclusions_honoured(self, migration_file_factory, cli_runner, migrations, pyproject_factory):
-        pyproject_factory({
-            "migrations": "./migrations",
-            "squash": {"exclude": ["20210101_03_ijkl-third-migration"]},
-        })
+        pyproject_factory(
+            {
+                "migrations": "./migrations",
+                "squash": {"exclude": ["20210101_03_ijkl-third-migration"]},
+            },
+        )
         migration_file_factory(
             "20210101_01_abcd-first-migration",
             "sql",
