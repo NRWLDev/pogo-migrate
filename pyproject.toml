@@ -107,6 +107,12 @@ addopts = [
 env = [
     "D:POSTGRES_DSN=postgres://unit:password@localhost:5435/unit",
 ]
+filterwarnings = [
+    "ignore:.*pogo_core.*:FutureWarning",
+]
+markers = [
+    "nosync: don't apply pogo system tables to the database prior to the test",
+]
 
 [tool.coverage.report]
 sort = "cover"
