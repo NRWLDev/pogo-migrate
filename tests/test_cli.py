@@ -794,18 +794,33 @@ class TestHistory:
         )
 
 
-class TestApply:
+class Base:
     async def assert_tables(self, db_session, tables):
         stmt = """
-        SELECT tablename
+        SELECT schemaname, tablename
         FROM pg_tables
-        WHERE  schemaname = 'public'
-        ORDER BY tablename
+        WHERE  schemaname in ('public', 'pogo')
+        ORDER BY schemaname, tablename
         """
         results = await db_session.fetch(stmt)
 
-        assert [r["tablename"] for r in results if not r["tablename"].startswith("_pogo")] == tables
+        assert [
+            f"{r['schemaname']}.{r['tablename']}" for r in results if not r["tablename"].startswith("_pogo")
+        ] == tables
 
+    async def assert_schemas(self, db_session, schemas):
+        stmt = """
+        SELECT schema_name
+        FROM information_schema.schemata
+        WHERE  schema_name NOT IN ('pg_toast', 'pg_catalog', 'information_schema')
+        ORDER BY schema_name
+        """
+        results = await db_session.fetch(stmt)
+
+        assert [r["schema_name"] for r in results] == schemas
+
+
+class TestApply(Base):
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
     async def test_apply_success_missing_config(self, cli_runner, migration_file_factory):
         migration_file_factory(
@@ -880,7 +895,7 @@ class TestApply:
             Applying 20210101_02_rando-commit
             """),
         )
-        await self.assert_tables(db_session, ["table_one", "table_two"])
+        await self.assert_tables(db_session, ["public.table_one", "public.table_two"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_apply_success(self, cli_runner, migration_file_factory, db_session):
@@ -916,7 +931,54 @@ class TestApply:
             Applying 20210101_02_rando-commit
             """),
         )
-        await self.assert_tables(db_session, ["table_one", "table_two"])
+        await self.assert_tables(db_session, ["public.table_one", "public.table_two"])
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_apply_success_multiple_schemas(self, cli_runner, migration_file_factory, db_session):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE table_one()
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            CREATE TABLE table_two()
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["apply", "-v"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Applying 20210101_01_rando-commit
+            Applying 20210101_02_rando-commit
+            """),
+        )
+        result = cli_runner.invoke(["apply", "-v", "--schema", "pogo", "--create-schema"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Applying 20210101_01_rando-commit
+            Applying 20210101_02_rando-commit
+            """),
+        )
+        await self.assert_tables(
+            db_session,
+            ["pogo.table_one", "pogo.table_two", "public.table_one", "public.table_two"],
+        )
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_apply_failure(self, cli_runner, migration_file_factory, db_session):
@@ -954,7 +1016,7 @@ class TestApply:
             """),
         )
 
-        await self.assert_tables(db_session, ["table_one"])
+        await self.assert_tables(db_session, ["public.table_one"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     def test_apply_failure_verbose(self, cli_runner, migration_file_factory):
@@ -987,18 +1049,7 @@ class TestApply:
         assert 'DuplicateTableError: relation "table_one" already exists' in result.output
 
 
-class TestRollback:
-    async def assert_tables(self, db_session, tables):
-        stmt = """
-        SELECT tablename
-        FROM pg_tables
-        WHERE  schemaname = 'public'
-        ORDER BY tablename
-        """
-        results = await db_session.fetch(stmt)
-
-        assert [r["tablename"] for r in results if not r["tablename"].startswith("_pogo")] == tables
-
+class TestRollback(Base):
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
     async def test_rollback_missing_configuration(self, cli_runner, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
@@ -1121,6 +1172,166 @@ class TestRollback:
         await self.assert_tables(db_session, [])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_rollback_partial_success(self, cli_runner, migration_file_factory, db_session):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
+        await db_session.execute("create table table_one();create table table_two()")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            DROP TABLE table_one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            DROP TABLE table_two;
+            """),
+        )
+        result = cli_runner.invoke(["rollback", "--count", "1", "-v"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Rolling back 20210101_02_rando-commit
+            """),
+        )
+        await self.assert_tables(db_session, ["public.table_one"])
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_rollback_drop_schema(self, cli_runner, migration_file_factory, db_session):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE table_one()
+            -- migrate: rollback
+            DROP TABLE table_one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            CREATE TABLE table_two()
+            -- migrate: rollback
+            DROP TABLE table_two;
+            """),
+        )
+        cli_runner.invoke(["apply", "--schema", "pogo", "--create-schema"])
+        result = cli_runner.invoke(["rollback", "--count", "-1", "-v", "--schema", "pogo", "--drop-schema"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Rolling back 20210101_02_rando-commit
+            Rolling back 20210101_01_rando-commit
+            """),
+        )
+        await self.assert_tables(db_session, [])
+        await self.assert_schemas(db_session, ["public"])
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_rollback_partial_wont_drop_schema(self, cli_runner, migration_file_factory, db_session):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE table_one()
+            -- migrate: rollback
+            DROP TABLE table_one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            CREATE TABLE table_two()
+            -- migrate: rollback
+            DROP TABLE table_two;
+            """),
+        )
+        cli_runner.invoke(["apply", "--schema", "pogo", "--create-schema"])
+        result = cli_runner.invoke(["rollback", "--count", "1", "-v", "--schema", "pogo", "--drop-schema"])
+        assert result.exit_code == 1, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Rolling back 20210101_02_rando-commit
+            migrations still exist, can't drop schema.
+            """),
+        )
+        await self.assert_tables(db_session, ["pogo.table_one"])
+        await self.assert_schemas(db_session, ["pogo", "public"])
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_rollback_partial_success_multi_schema(self, cli_runner, migration_file_factory, db_session):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
+        await db_session.execute("create table table_one();create table table_two()")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE table_one()
+            -- migrate: rollback
+            DROP TABLE table_one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            CREATE TABLE table_two()
+            -- migrate: rollback
+            DROP TABLE table_two;
+            """),
+        )
+        cli_runner.invoke(["apply"])
+        cli_runner.invoke(["apply", "--schema", "pogo", "--create-schema"])
+        result = cli_runner.invoke(["rollback", "--count", "1", "-v", "--schema", "pogo"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Rolling back 20210101_02_rando-commit
+            """),
+        )
+        await self.assert_tables(db_session, ["pogo.table_one", "public.table_one", "public.table_two"])
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_rollback_failure(self, cli_runner, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         await db_session.execute("create table table_one();create table table_two()")
@@ -1147,7 +1358,7 @@ class TestRollback:
             """),
         )
 
-        await self.assert_tables(db_session, ["table_one", "table_two"])
+        await self.assert_tables(db_session, ["public.table_one", "public.table_two"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_rollback_failure_verbose(self, cli_runner, migration_file_factory, db_session):

@@ -382,6 +382,7 @@ def apply(
     database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
     schema: str | None = typer.Option(None, help="Schema override."),
+    create_schema: bool = typer.Option(False, "--create-schema/ ", help="Create database schema."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -401,7 +402,7 @@ def apply(
 
         connection_string = database or config.database_dsn
         schema_name = schema or config.schema
-        db = await sql.get_connection(connection_string, schema_name=schema_name)
+        db = await sql.get_connection(connection_string, schema_name=schema_name, schema_create=create_schema)
 
         await migrate.apply(db, config.migrations, schema_name=schema_name, logger=context)
 
@@ -419,6 +420,11 @@ def rollback(
     ),
     *,
     schema: str | None = typer.Option(None, help="Schema override."),
+    drop_schema: bool = typer.Option(
+        False,  # noqa: FBT003
+        "--drop-schema/ ",
+        help="Drop database schema if all migrations rolled back.",
+    ),
     verbose: int = typer.Option(
         0,
         "-v",
@@ -447,6 +453,15 @@ def rollback(
             count=count if count > 0 else None,
             schema_name=schema_name,
         )
+
+        if drop_schema:
+            applied_migrations = await sql.get_applied_migrations(db, schema_name=schema_name) if db else set()
+
+            if len(applied_migrations) > 0:
+                context.error("migrations still exist, can't drop schema.")
+                raise typer.Exit(code=1)
+
+            await sql.drop_schema(db, schema_name=schema_name)
 
     asyncio.run(rollback_())
 
