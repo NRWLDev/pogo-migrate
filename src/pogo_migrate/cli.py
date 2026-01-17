@@ -105,6 +105,7 @@ def handle_exceptions(context: Context) -> t.Callable[t.Callable[P, t.Awaitable[
 def init(
     migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
     database_config: str = typer.Option("{POGO_DATABASE}", "-d", "--database-env-key"),
+    schema: str | None = typer.Option("public", help="Default schema name."),
     verbose: int = typer.Option(
         0,
         "-v",
@@ -149,6 +150,7 @@ def init(
                 "pogo": {
                     "migrations": f"./{loc}",
                     "database_config": database_config,
+                    "schema": schema,
                 },
             },
         }
@@ -293,7 +295,7 @@ def new(
         load_dotenv()
         config = load_config()
 
-        migrations = await sql.read_migrations(config.migrations, db=None)
+        migrations = await sql.read_migrations(config.migrations, db=None, schema_name="public")
         heads = find_heads([m.load() for m in migrations])
 
         template = migration_sql_template if not py_ else migration_template
@@ -320,6 +322,7 @@ def new(
 def history(
     database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
+    schema: str | None = typer.Option(None, help="Schema override."),
     unapplied: bool = typer.Option(False, help="Show only unapplied migrations."),  # noqa: FBT003
     simple: bool = typer.Option(False, help="Show raw data without tabulation."),  # noqa: FBT003
     verbose: int = typer.Option(
@@ -347,12 +350,13 @@ def history(
             connection_string = database or config.database_dsn
         except exceptions.InvalidConfigurationError:
             connection_string = database
-        db = await sql.get_connection(connection_string) if connection_string else None
+        schema_name = schema or config.schema
+        db = await sql.get_connection(connection_string, schema_name=schema_name) if connection_string else None
 
         if db is None:
             context.warning("Database connection can not be established, migration status can not be determined.")
 
-        migrations = await sql.read_migrations(config.migrations, db)
+        migrations = await sql.read_migrations(config.migrations, db, schema_name=schema_name)
         migrations = topological_sort([m.load() for m in migrations])
 
         data = (
@@ -377,6 +381,8 @@ def history(
 def apply(
     database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
+    schema: str | None = typer.Option(None, help="Schema override."),
+    create_schema: bool = typer.Option(False, "--create-schema/ ", help="Create database schema."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
         "-v",
@@ -395,9 +401,10 @@ def apply(
         config = load_config()
 
         connection_string = database or config.database_dsn
-        db = await sql.get_connection(connection_string)
+        schema_name = schema or config.schema
+        db = await sql.get_connection(connection_string, schema_name=schema_name, schema_create=create_schema)
 
-        await migrate.apply(db, config.migrations, logger=context)
+        await migrate.apply(db, config.migrations, schema_name=schema_name, logger=context)
 
     asyncio.run(apply_())
 
@@ -412,6 +419,12 @@ def rollback(
         help="Number of migrations to rollback",
     ),
     *,
+    schema: str | None = typer.Option(None, help="Schema override."),
+    drop_schema: bool = typer.Option(
+        False,  # noqa: FBT003
+        "--drop-schema/ ",
+        help="Drop database schema if all migrations rolled back.",
+    ),
     verbose: int = typer.Option(
         0,
         "-v",
@@ -430,9 +443,25 @@ def rollback(
         config = load_config()
 
         connection_string = database or config.database_dsn
-        db = await sql.get_connection(connection_string)
+        schema_name = schema or config.schema
+        db = await sql.get_connection(connection_string, schema_name=schema_name)
 
-        await migrate.rollback(db, config.migrations, logger=context, count=count if count > 0 else None)
+        await migrate.rollback(
+            db,
+            config.migrations,
+            logger=context,
+            count=count if count > 0 else None,
+            schema_name=schema_name,
+        )
+
+        if drop_schema:
+            applied_migrations = await sql.get_applied_migrations(db, schema_name=schema_name) if db else set()
+
+            if len(applied_migrations) > 0:
+                context.error("migrations still exist, can't drop schema.")
+                raise typer.Exit(code=1)
+
+            await sql.drop_schema(db, schema_name=schema_name)
 
     asyncio.run(rollback_())
 
@@ -748,6 +777,7 @@ def mark(
     migration_id: str | None = typer.Option(None, "-m", "--migration", help="Specific migration to mark."),
     database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
+    schema: str | None = typer.Option(None, help="Schema override."),
     interactive: bool = typer.Option(True, help="Confirm all changes."),  # noqa: FBT003
     verbose: int = typer.Option(
         0,
@@ -770,9 +800,10 @@ def mark(
         config = load_config()
 
         connection_string = database or config.database_dsn
-        db = await sql.get_connection(connection_string)
+        schema_name = schema or config.schema
+        db = await sql.get_connection(connection_string, schema_name=schema_name)
 
-        migrations = await sql.read_migrations(config.migrations, db)
+        migrations = await sql.read_migrations(config.migrations, db, schema_name=schema_name)
         migrations = topological_sort([m.load() for m in migrations if migration_id is None or m.id == migration_id])
 
         async with db.transaction():
@@ -782,7 +813,7 @@ def mark(
                     if interactive and not typer.confirm(f"Mark {migration.id} as applied?"):
                         break
 
-                    await sql.migration_applied(db, migration.id, migration.hash)
+                    await sql.migration_applied(db, migration.id, migration.hash, schema_name=schema_name)
 
     asyncio.run(_mark())
 
@@ -792,6 +823,7 @@ def unmark(
     migration_id: str | None = typer.Option(None, "-m", "--migration", help="Specific migration to mark."),
     database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
+    schema: str | None = typer.Option(None, help="Schema override."),
     verbose: int = typer.Option(
         0,
         "-v",
@@ -813,9 +845,10 @@ def unmark(
         config = load_config()
 
         connection_string = database or config.database_dsn
-        db = await sql.get_connection(connection_string)
+        schema_name = schema or config.schema
+        db = await sql.get_connection(connection_string, schema_name=schema_name)
 
-        migrations = await sql.read_migrations(config.migrations, db)
+        migrations = await sql.read_migrations(config.migrations, db, schema_name=schema_name)
         migrations = reversed(
             topological_sort([m.load() for m in migrations if migration_id is None or m.id == migration_id]),
         )
@@ -827,7 +860,7 @@ def unmark(
                     if not typer.confirm(f"Unmark {migration.id} as applied?"):
                         break
 
-                    await sql.migration_unapplied(db, migration.id)
+                    await sql.migration_unapplied(db, migration.id, schema_name=schema_name)
 
     asyncio.run(_unmark())
 

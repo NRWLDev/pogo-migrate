@@ -57,6 +57,7 @@ class TestInit:
             [tool.pogo]
             migrations = './migrations'
             database_config = '{POGO_DATABASE}'
+            schema = 'public'
             """)
 
     def test_init_invalid_migrations_location(self, cwd, cli_runner):
@@ -86,10 +87,14 @@ class TestInit:
             [tool.pogo]
             migrations = './migrations'
             database_config = '{POGO_DATABASE}'
+            schema = 'public'
             """)
 
     def test_init_overrides(self, cwd, cli_runner):
-        result = cli_runner.invoke(["init", "-m", "./my-migrations", "-d", "{POSTGRES_DSN}"], input="y\n")
+        result = cli_runner.invoke(
+            ["init", "-m", "./my-migrations", "-d", "{POSTGRES_DSN}", "--schema", "pogo"],
+            input="y\n",
+        )
         assert result.exit_code == 0, result.output
 
         p = cwd / "pyproject.toml"
@@ -99,6 +104,7 @@ class TestInit:
             [tool.pogo]
             migrations = './my-migrations'
             database_config = '{POSTGRES_DSN}'
+            schema = 'pogo'
             """)
 
     def test_init_already_configured(self, cwd, cli_runner):
@@ -137,6 +143,7 @@ class TestInit:
             [tool.pogo]
             migrations = './my-migrations'
             database_config = '{POSTGRES_DSN}'
+            schema = 'public'
             """),
             )
 
@@ -149,6 +156,7 @@ class TestInit:
             [tool.pogo]
             migrations = "./my-migrations"
             database_config = "{POSTGRES_DSN}"
+            schema = "public"
             """),
         )
 
@@ -683,7 +691,7 @@ class TestHistory:
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_migrations_partial_applied(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -719,7 +727,7 @@ class TestHistory:
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_migrations_partial_applied_only_unapplied(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -754,7 +762,7 @@ class TestHistory:
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_migrations_partial_applied_unapplied_simple(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -786,18 +794,33 @@ class TestHistory:
         )
 
 
-class TestApply:
+class Base:
     async def assert_tables(self, db_session, tables):
         stmt = """
-        SELECT tablename
+        SELECT schemaname, tablename
         FROM pg_tables
-        WHERE  schemaname = 'public'
-        ORDER BY tablename
+        WHERE  schemaname in ('public', 'pogo')
+        ORDER BY schemaname, tablename
         """
         results = await db_session.fetch(stmt)
 
-        assert [r["tablename"] for r in results if not r["tablename"].startswith("_pogo")] == tables
+        assert [
+            f"{r['schemaname']}.{r['tablename']}" for r in results if not r["tablename"].startswith("_pogo")
+        ] == tables
 
+    async def assert_schemas(self, db_session, schemas):
+        stmt = """
+        SELECT schema_name
+        FROM information_schema.schemata
+        WHERE  schema_name NOT IN ('pg_toast', 'pg_catalog', 'information_schema')
+        ORDER BY schema_name
+        """
+        results = await db_session.fetch(stmt)
+
+        assert [r["schema_name"] for r in results] == schemas
+
+
+class TestApply(Base):
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
     async def test_apply_success_missing_config(self, cli_runner, migration_file_factory):
         migration_file_factory(
@@ -872,7 +895,7 @@ class TestApply:
             Applying 20210101_02_rando-commit
             """),
         )
-        await self.assert_tables(db_session, ["table_one", "table_two"])
+        await self.assert_tables(db_session, ["public.table_one", "public.table_two"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_apply_success(self, cli_runner, migration_file_factory, db_session):
@@ -908,7 +931,54 @@ class TestApply:
             Applying 20210101_02_rando-commit
             """),
         )
-        await self.assert_tables(db_session, ["table_one", "table_two"])
+        await self.assert_tables(db_session, ["public.table_one", "public.table_two"])
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_apply_success_multiple_schemas(self, cli_runner, migration_file_factory, db_session):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE table_one()
+            -- migrate: rollback
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            CREATE TABLE table_two()
+            -- migrate: rollback
+            """),
+        )
+        result = cli_runner.invoke(["apply", "-v"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Applying 20210101_01_rando-commit
+            Applying 20210101_02_rando-commit
+            """),
+        )
+        result = cli_runner.invoke(["apply", "-v", "--schema", "pogo", "--create-schema"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Applying 20210101_01_rando-commit
+            Applying 20210101_02_rando-commit
+            """),
+        )
+        await self.assert_tables(
+            db_session,
+            ["pogo.table_one", "pogo.table_two", "public.table_one", "public.table_two"],
+        )
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_apply_failure(self, cli_runner, migration_file_factory, db_session):
@@ -946,7 +1016,7 @@ class TestApply:
             """),
         )
 
-        await self.assert_tables(db_session, ["table_one"])
+        await self.assert_tables(db_session, ["public.table_one"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     def test_apply_failure_verbose(self, cli_runner, migration_file_factory):
@@ -979,22 +1049,11 @@ class TestApply:
         assert 'DuplicateTableError: relation "table_one" already exists' in result.output
 
 
-class TestRollback:
-    async def assert_tables(self, db_session, tables):
-        stmt = """
-        SELECT tablename
-        FROM pg_tables
-        WHERE  schemaname = 'public'
-        ORDER BY tablename
-        """
-        results = await db_session.fetch(stmt)
-
-        assert [r["tablename"] for r in results if not r["tablename"].startswith("_pogo")] == tables
-
+class TestRollback(Base):
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
     async def test_rollback_missing_configuration(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
-        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
         await db_session.execute("create table table_one();create table table_two()")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -1036,8 +1095,8 @@ class TestRollback:
         db_session,
         postgres_dsn,
     ):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
-        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
         await db_session.execute("create table table_one();create table table_two()")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -1075,8 +1134,8 @@ class TestRollback:
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_rollback_success(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
-        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
         await db_session.execute("create table table_one();create table table_two()")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -1113,8 +1172,168 @@ class TestRollback:
         await self.assert_tables(db_session, [])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_rollback_partial_success(self, cli_runner, migration_file_factory, db_session):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
+        await db_session.execute("create table table_one();create table table_two()")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            -- migrate: rollback
+            DROP TABLE table_one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            -- migrate: rollback
+            DROP TABLE table_two;
+            """),
+        )
+        result = cli_runner.invoke(["rollback", "--count", "1", "-v"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Rolling back 20210101_02_rando-commit
+            """),
+        )
+        await self.assert_tables(db_session, ["public.table_one"])
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_rollback_drop_schema(self, cli_runner, migration_file_factory, db_session):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE table_one()
+            -- migrate: rollback
+            DROP TABLE table_one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            CREATE TABLE table_two()
+            -- migrate: rollback
+            DROP TABLE table_two;
+            """),
+        )
+        cli_runner.invoke(["apply", "--schema", "pogo", "--create-schema"])
+        result = cli_runner.invoke(["rollback", "--count", "-1", "-v", "--schema", "pogo", "--drop-schema"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Rolling back 20210101_02_rando-commit
+            Rolling back 20210101_01_rando-commit
+            """),
+        )
+        await self.assert_tables(db_session, [])
+        await self.assert_schemas(db_session, ["public"])
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_rollback_partial_wont_drop_schema(self, cli_runner, migration_file_factory, db_session):
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE table_one()
+            -- migrate: rollback
+            DROP TABLE table_one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            CREATE TABLE table_two()
+            -- migrate: rollback
+            DROP TABLE table_two;
+            """),
+        )
+        cli_runner.invoke(["apply", "--schema", "pogo", "--create-schema"])
+        result = cli_runner.invoke(["rollback", "--count", "1", "-v", "--schema", "pogo", "--drop-schema"])
+        assert result.exit_code == 1, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Rolling back 20210101_02_rando-commit
+            migrations still exist, can't drop schema.
+            """),
+        )
+        await self.assert_tables(db_session, ["pogo.table_one"])
+        await self.assert_schemas(db_session, ["pogo", "public"])
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
+    async def test_rollback_partial_success_multi_schema(self, cli_runner, migration_file_factory, db_session):
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
+        await db_session.execute("create table table_one();create table table_two()")
+        migration_file_factory(
+            "20210101_01_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends:
+
+            -- migrate: apply
+            CREATE TABLE table_one()
+            -- migrate: rollback
+            DROP TABLE table_one;
+            """),
+        )
+        migration_file_factory(
+            "20210101_02_rando-commit",
+            "sql",
+            dedent("""
+            -- commit
+            -- depends: 20210101_01_rando-commit
+
+            -- migrate: apply
+            CREATE TABLE table_two()
+            -- migrate: rollback
+            DROP TABLE table_two;
+            """),
+        )
+        cli_runner.invoke(["apply"])
+        cli_runner.invoke(["apply", "--schema", "pogo", "--create-schema"])
+        result = cli_runner.invoke(["rollback", "--count", "1", "-v", "--schema", "pogo"])
+        assert result.exit_code == 0, result.output
+        cli_runner.assert_output(
+            dedent("""\
+            Rolling back 20210101_02_rando-commit
+            """),
+        )
+        await self.assert_tables(db_session, ["pogo.table_one", "public.table_one", "public.table_two"])
+
+    @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_rollback_failure(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         await db_session.execute("create table table_one();create table table_two()")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -1139,11 +1358,11 @@ class TestRollback:
             """),
         )
 
-        await self.assert_tables(db_session, ["table_one", "table_two"])
+        await self.assert_tables(db_session, ["public.table_one", "public.table_two"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_rollback_failure_verbose(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1342,7 +1561,7 @@ class TestMark:
 
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
     async def test_mark_missing_config(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1392,7 +1611,7 @@ class TestMark:
         db_session,
         postgres_dsn,
     ):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1434,12 +1653,12 @@ class TestMark:
             Mark 20210101_03_rando-commit as applied? [y/N]: n
             """),
         )
-        applied_migrations = await sql.get_applied_migrations(db_session)
+        applied_migrations = await sql.get_applied_migrations(db_session, schema_name="public")
         assert applied_migrations == {"20210101_01_rando-commit", "20210101_02_rando-commit"}
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_mark_migrations_applied(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1481,12 +1700,12 @@ class TestMark:
             Mark 20210101_03_rando-commit as applied? [y/N]: n
             """),
         )
-        applied_migrations = await sql.get_applied_migrations(db_session)
+        applied_migrations = await sql.get_applied_migrations(db_session, schema_name="public")
         assert applied_migrations == {"20210101_01_rando-commit", "20210101_02_rando-commit"}
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_mark_migration_applied(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1527,12 +1746,12 @@ class TestMark:
             Mark 20210101_02_rando-commit as applied? [y/N]: y
             """),
         )
-        applied_migrations = await sql.get_applied_migrations(db_session)
+        applied_migrations = await sql.get_applied_migrations(db_session, schema_name="public")
         assert applied_migrations == {"20210101_01_rando-commit", "20210101_02_rando-commit"}
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_mark_migrations_non_interactive(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1571,7 +1790,7 @@ class TestMark:
         cli_runner.assert_output(
             dedent(""),
         )
-        applied_migrations = await sql.get_applied_migrations(db_session)
+        applied_migrations = await sql.get_applied_migrations(db_session, schema_name="public")
         assert applied_migrations == {
             "20210101_01_rando-commit",
             "20210101_02_rando-commit",
@@ -1590,8 +1809,8 @@ class TestUnMark:
 
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
     async def test_unmark_missing_config(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
-        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1641,8 +1860,8 @@ class TestUnMark:
         db_session,
         postgres_dsn,
     ):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
-        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1684,13 +1903,13 @@ class TestUnMark:
             Unmark 20210101_01_rando-commit as applied? [y/N]: n
             """),
         )
-        applied_migrations = await sql.get_applied_migrations(db_session)
+        applied_migrations = await sql.get_applied_migrations(db_session, schema_name="public")
         assert applied_migrations == {"20210101_01_rando-commit"}
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_unmark_migrations(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
-        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1732,13 +1951,13 @@ class TestUnMark:
             Unmark 20210101_01_rando-commit as applied? [y/N]: n
             """),
         )
-        applied_migrations = await sql.get_applied_migrations(db_session)
+        applied_migrations = await sql.get_applied_migrations(db_session, schema_name="public")
         assert applied_migrations == {"20210101_01_rando-commit"}
 
     @pytest.mark.usefixtures("migrations", "pyproject")
     async def test_unmark_migration(self, cli_runner, migration_file_factory, db_session):
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
-        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
+        await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1779,7 +1998,7 @@ class TestUnMark:
             Unmark 20210101_02_rando-commit as applied? [y/N]: y
             """),
         )
-        applied_migrations = await sql.get_applied_migrations(db_session)
+        applied_migrations = await sql.get_applied_migrations(db_session, schema_name="public")
         assert applied_migrations == {"20210101_01_rando-commit"}
 
 
@@ -1837,7 +2056,7 @@ class TestMigrateYoyo:
             migration_id varchar(255),
             applied_at_utc timestamp
         );""")
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
 
         result = cli_runner.invoke(["migrate-yoyo", "-v"])
         assert result.exit_code == 1
@@ -1855,7 +2074,7 @@ class TestMigrateYoyo:
             migration_id varchar(255),
             applied_at_utc timestamp
         );""")
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
 
         result = cli_runner.invoke(["migrate-yoyo", "-vvv", "--database", postgres_dsn])
         assert result.exit_code == 0
@@ -1873,7 +2092,7 @@ class TestMigrateYoyo:
             migration_id varchar(255),
             applied_at_utc timestamp
         );""")
-        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash")
+        await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
 
         result = cli_runner.invoke(["migrate-yoyo", "-vvv"])
         assert result.exit_code == 0

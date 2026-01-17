@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing as t
+from warnings import warn
 
 from pogo_core import squash
 
@@ -11,6 +12,12 @@ if t.TYPE_CHECKING:
 
 
 squash_sql_template: str = squash.squash_sql_template
+
+warn(
+    "pogo_migrate.squash usage has been deprecated, please use pogo_core.squash",
+    FutureWarning,
+    stacklevel=2,
+)
 
 
 def remove(context: Context, current: Migration, dependent: Migration | None, *, backup: bool = False) -> None:

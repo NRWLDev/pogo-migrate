@@ -30,7 +30,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "pogo-core >= 0.1.0",
+    "pogo-core >= 0.1.1",
     "typer-slim >= 0",
     "rtoml >= 0.10",
     "sqlparse >= 0.5.2",
@@ -105,6 +105,12 @@ addopts = [
 ]
 env = [
     "D:POSTGRES_DSN=postgres://unit:password@localhost:5435/unit",
+]
+filterwarnings = [
+    "ignore:.*pogo_core.*:FutureWarning",
+]
+markers = [
+    "nosync: don't apply pogo system tables to the database prior to the test",
 ]
 
 [tool.coverage.report]

@@ -24,6 +24,7 @@ class Config:
     migrations: Path
     squash: Squash = dataclasses.field(default_factory=Squash)
     database_config: str | None = None
+    schema: str = "public"
 
     @property
     def database_dsn(self: t.Self) -> str:

@@ -14,6 +14,7 @@ Supported flags:
   [configuration](https://nrwldev.github.io/pogo-migrate/configuration/) for
   examples. For setups running migrations purely in code, this configuration
   can be omitted.
+- `--schema` defines the default schema migrations will be run against.
 
 ### Migrating from yoyo
 
@@ -62,6 +63,8 @@ Supported flags:
   fall back to configuration.
 - `--dotenv, --no-dotenv` load environment from local `.env` file. (defaults to
   `--no-dotenv`)
+- `--schema` override default schema for migrations being applied.
+- `--create-schema` optional flag to create the schema before running initial migrations.
 
 ### Marking a migration as applied
 
@@ -76,6 +79,7 @@ confirm which ones to mark as applied.
 - `--dotenv, --no-dotenv` load environment from local `.env` file. (defaults to
   `--no-dotenv`)
 - `--interactive, --no-interactive` confirm all changes. (defaults to `--interactive)
+- `--schema` override default schema for migration to be marked.
 
 ## Rolling back migrations
 
@@ -89,6 +93,9 @@ Supported flags:
   fall back to configuration.
 - `--dotenv, --no-dotenv` load environment from local `.env` file. (defaults to
   `--no-dotenv`)
+- `--schema` override default schema for migrations being rolled back.
+- `--drop-schema` optional flag to drop migration schema if all migrations
+  rolled back.
 
 ### Marking a migration as rolled back
 
@@ -99,6 +106,25 @@ unmark` will mark a migration as unapplied.
   fall back to configuration.
 - `--dotenv, --no-dotenv` load environment from local `.env` file. (defaults to
   `--no-dotenv`)
+- `--schema` override default schema for migrations being rolled back.
+
+## Multiple schemas
+
+If you have multiple projects with their own migrations that you wish to manage
+in a single database with separate migrations per project. Configure each
+project with the desired schema, and apply migrations as normal. The
+configuration will ensure they are run in the correct schema.
+
+If you have a single project with migrations that you wish to manage in
+multiple schemas, use the `--schema` override flag.
+
+For example:
+
+```bash
+$ pogo apply --schema companya
+$ pogo apply --schema companyb
+$ pogo rollback --count -1 --schema companyb
+```
 
 ## View migration status
 
@@ -111,6 +137,7 @@ with one of U (unapplied) or A (applied), as well as the migration format `sql` 
   fall back to configuration.
 - `--dotenv, --no-dotenv` load environment from local `.env` file. (defaults to
   `--no-dotenv`)
+- `--schema` override default schema.
 
 `pogo history` can be useful in docker containers to prevent start up of an
 application until migrations are completed, i.e. checking that there are no
@@ -215,10 +242,10 @@ database connection (for example from an application framework), the code can
 be simplified down to.
 
 ```python
-from pogo_migrate import migrate
+from pogo_migrate import config, migrate
 
-migrations_dir = Path("/path/to/migrations")
-conn = await asyncpg.connect(postgres_dsn)
+c = config.load_config()
+conn = await asyncpg.connect(c.postgres_dsn)
 
 await migrate.apply(db=conn, migrations_dir=c.migrations)
 await migrate.rollback(db=conn, migrations_dir=c.migrations)
