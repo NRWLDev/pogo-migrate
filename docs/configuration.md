@@ -7,6 +7,7 @@ manually.
 [tool.pogo]
 migrations_location = "./migrations"
 database_config = "{POSTGRES_DSN}"
+schema = "public"
 ```
 
 If you have an existing environment with separate configuration values for
@@ -16,6 +17,7 @@ postgres, you can build the DSN in config.
 [tool.pogo]
 migrations_location = "./migrations"
 database_config = "postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{PORTGRES_DATABASE}"
+schema = "public"
 ```
 
 If you are using the cli purely to generate new migrations files and running
@@ -36,3 +38,9 @@ specific migrations from being included when `pogo squash` is run.
 [tool.pogo.squash]
 exclude = ["migration-id-1", "migration-id-5"]
 ```
+
+## Schema configuration
+
+If you want migrations to run in a specific (or default) schema, you can define
+it in configuration, this value can be overridden per call in the CLI if you
+need to run the migrations against multiple schemas.
