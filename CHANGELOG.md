@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.4.0 (released 2026-01-17)
+
+### Features and Improvements
+
+- **Breaking** Migrate to use pogo_core library for underlying functionality [[50](https://github.com/NRWLDev/pogo-migrate/issues/50)] [[ff7d612](https://github.com/NRWLDev/pogo-migrate/commit/ff7d6123fdef848551a02842081d343a9e702df5)]
+- Add support for multiple schemas. [[51](https://github.com/NRWLDev/pogo-migrate/issues/51)] [[bed889f](https://github.com/NRWLDev/pogo-migrate/commit/bed889f03ba166ae48bad1b7aad153caccc64a0a)]
+
+### Miscellaneous
+
+- **Breaking** Drop python 3.9 support. [[3f7cd8c](https://github.com/NRWLDev/pogo-migrate/commit/3f7cd8cdec437c7638047c47869ac38257612e29)]
+
 ## v0.3.3 (released 2025-05-27)
 
 ### Features and Improvements
