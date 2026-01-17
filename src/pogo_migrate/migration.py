@@ -9,9 +9,9 @@ from pogo_core.migration import (
 
 __all__ = [
     "Migration",
+    "find_heads",
+    "read_sql_migration",
     "strip_comments",
     "terminate_statements",
-    "read_sql_migration",
     "topological_sort",
-    "find_heads",
 ]

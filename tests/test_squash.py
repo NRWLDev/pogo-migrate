@@ -580,7 +580,7 @@ def test_parse_sqlglot_identifier(statement, expected_identifier, context):
 )
 def test_parse_sqlglot_identifier_aborts_at_table_keyword(statement, context):
     # Original code would pick up column identifier.
-    with pytest.raises(squash.ParseError, match="Expected table name but got lock."):
+    with pytest.raises(squash.ParseError, match=r"Expected table name but got lock."):
         squash.parse_sqlglot(context, statement)
 
 
