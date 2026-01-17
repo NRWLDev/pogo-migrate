@@ -47,7 +47,7 @@ def _version_callback(*, value: bool) -> None:
 
 
 def _callback(  # pragma: no cover
-    _version: bool | None = typer.Option(
+    _version: bool | None = typer.Option(  # noqa: FBT001
         None,
         "-v",
         "--version",
@@ -218,7 +218,7 @@ h: show this help
 
 def create_with_editor(config: Config, content: str, extension: str, context: Context) -> Path:
     editor = get_editor()
-    tmpfile = NamedTemporaryFile(
+    tmpfile = NamedTemporaryFile(  # noqa: SIM115
         mode="w",
         encoding="UTF-8",
         dir=config.migrations,
@@ -699,7 +699,7 @@ def validate(
 
     for migration in migrations:
         if not migration.is_sql:
-            from unittest import mock
+            from unittest import mock  # noqa: PLC0415
 
             mock_asyncpg = mock.Mock()
             mock_asyncpg.execute = mock.AsyncMock(return_value=None)
