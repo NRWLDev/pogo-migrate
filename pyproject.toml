@@ -30,7 +30,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "pogo-core >= 0.1.0",
+    "pogo-core >= 0.1.1",
     "typer-slim >= 0",
     "rtoml >= 0.10",
     "sqlparse >= 0.5.2",
