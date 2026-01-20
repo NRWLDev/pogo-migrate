@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://nrwldev.github.io/pogo-migrate/</loc>
+         <lastmod>2026-01-20</lastmod>
+    </url>
+    <url>
+         <loc>https://nrwldev.github.io/pogo-migrate/configuration/</loc>
+         <lastmod>2026-01-20</lastmod>
+    </url>
+    <url>
+         <loc>https://nrwldev.github.io/pogo-migrate/testing/</loc>
+         <lastmod>2026-01-20</lastmod>
+    </url>
+    <url>
+         <loc>https://nrwldev.github.io/pogo-migrate/thanks/</loc>
+         <lastmod>2026-01-20</lastmod>
+    </url>
+    <url>
+         <loc>https://nrwldev.github.io/pogo-migrate/usage/</loc>
+         <lastmod>2026-01-20</lastmod>
+    </url>
+    <url>
+         <loc>https://nrwldev.github.io/pogo-migrate/why-pogo/</loc>
+         <lastmod>2026-01-20</lastmod>
+    </url>
+</urlset>
