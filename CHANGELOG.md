@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.1 (released 2026-01-20)
+
+### Bug fixes
+
+- Pass config schema through to core testing utils. [[017513b](https://github.com/NRWLDev/pogo-migrate/commit/017513b4af03b15a6ab89441239c2202e10be276)]
+
 ## v0.4.0 (released 2026-01-17)
 
 ### Features and Improvements
