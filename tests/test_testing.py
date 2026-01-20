@@ -19,6 +19,7 @@ async def test_apply(monkeypatch, db_session, cwd):
     assert core_testing.migrate.apply.call_args == mock.call(
         db_session,
         cwd / "migrations",
+        schema_name="public",
     )
 
 
@@ -31,6 +32,7 @@ async def test_apply_loads_db(monkeypatch, cwd):
     assert core_testing.migrate.apply.call_args == mock.call(
         mock_session,
         cwd / "migrations",
+        schema_name="public",
     )
     assert mock_session.close.call_count == 1
 
@@ -42,6 +44,7 @@ async def test_rollback(monkeypatch, db_session, cwd):
     assert core_testing.migrate.rollback.call_args == mock.call(
         db_session,
         cwd / "migrations",
+        schema_name="public",
     )
 
 
@@ -54,5 +57,6 @@ async def test_rollback_loads_db(monkeypatch, cwd):
     assert core_testing.migrate.rollback.call_args == mock.call(
         mock_session,
         cwd / "migrations",
+        schema_name="public",
     )
     assert mock_session.close.call_count == 1
