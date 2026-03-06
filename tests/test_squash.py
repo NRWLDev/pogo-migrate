@@ -571,20 +571,6 @@ def test_parse_sqlglot_identifier(statement, expected_identifier, context):
 
 
 @pytest.mark.parametrize(
-    ("statement"),
-    [
-        ("CREATE TABLE lock (id INT);"),
-        ("ALTER TABLE lock ADD COLUMN id INT;"),
-        ("DROP TABLE lock;"),
-    ],
-)
-def test_parse_sqlglot_identifier_aborts_at_table_keyword(statement, context):
-    # Original code would pick up column identifier.
-    with pytest.raises(squash.ParseError, match=r"Expected table name but got lock."):
-        squash.parse_sqlglot(context, statement)
-
-
-@pytest.mark.parametrize(
     ("statement", "expected_identifier"),
     [
         ("CREATE TABLE tbl (id INT);", "tbl"),

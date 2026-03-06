@@ -10,7 +10,7 @@ maintainers = [
     {name = "Daniel Edgecombe", email = "daniel@nrwl.co"},
 ]
 license = "Apache-2.0"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10"
 keywords = ["migrations", "migrate", "database", "asyncpg", "yoyo"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -26,6 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3",
 ]
 
@@ -57,6 +58,7 @@ dev = [
     # Style
     "ruff >= 0.14.10",
     "pre-commit >= 3.7.1",
+    "ty >= 0.0.17",
 
     # release
     "changelog-gen >= 0.13",
@@ -140,6 +142,7 @@ ignore = [
     "TD003",
     "ERA",
     "E501",    # Handled by ruff format
+    "ASYNC240",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -164,6 +167,12 @@ known-first-party = ["pogo_migrate"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.ty.terminal]
+output-format = "concise"
+
+[tool.ty.src]
+exclude = ["tests/*"]
 
 [build-system]
 requires = ["hatchling"]
