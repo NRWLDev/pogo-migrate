@@ -443,12 +443,12 @@ wheels = [
 ]
 
 [[package]]
-name = "nest-asyncio"
-version = "1.6.0"
+name = "nest-asyncio2"
+version = "1.7.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/83/f8/51569ac65d696c8ecbee95938f89d4abf00f47d58d48f6fbabfe8f0baefe/nest_asyncio-1.6.0.tar.gz", hash = "sha256:6f172d5449aca15afd6c646851f4e31e02c598d553a667e38cafa997cfec55fe", size = 7418 }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/73/731debf26e27e0a0323d7bda270dc2f634b398e38f040a09da1f4351d0aa/nest_asyncio2-1.7.2.tar.gz", hash = "sha256:1921d70b92cc4612c374928d081552efb59b83d91b2b789d935c665fa01729a8", size = 14743 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a0/c4/c2971a3ba4c6103a3d10c4b0f24f461ddc027f0f09763220cf35ca1401b3/nest_asyncio-1.6.0-py3-none-any.whl", hash = "sha256:87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c", size = 5195 },
+    { url = "https://files.pythonhosted.org/packages/c5/3c/3179b85b0e1c3659f0369940200cd6d0fa900e6cefcc7ea0bc6dd0e29ffb/nest_asyncio2-1.7.2-py3-none-any.whl", hash = "sha256:f5dfa702f3f81f6a03857e9a19e2ba578c0946a4ad417b4c50a24d7ba641fe01", size = 7843 },
 ]
 
 [[package]]
@@ -518,7 +518,7 @@ dependencies = [
 dev = [
     { name = "asyncpg" },
     { name = "changelog-gen" },
-    { name = "nest-asyncio" },
+    { name = "nest-asyncio2" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -538,7 +538,7 @@ dev = [
 requires-dist = [
     { name = "asyncpg", marker = "extra == 'dev'", specifier = ">=0.31.0" },
     { name = "changelog-gen", marker = "extra == 'dev'", specifier = ">=0.13" },
-    { name = "nest-asyncio", marker = "extra == 'dev'", specifier = ">=1.6.0" },
+    { name = "nest-asyncio2", marker = "extra == 'dev'", specifier = ">=1.6.0" },
     { name = "pogo-core", specifier = ">=0.1.2" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.7.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },

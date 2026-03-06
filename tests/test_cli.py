@@ -1,13 +1,25 @@
+import asyncio
 import importlib.metadata
 from pathlib import Path
 from textwrap import dedent
 from unittest import mock
 
+import nest_asyncio2
 import pytest
 from pogo_core.util import sql
 
 from pogo_migrate import cli
 from tests.util import AsyncMock
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _apply_nest_asyncio():
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    nest_asyncio2.apply(loop)
+    try:
+        yield
+    finally:
+        loop.close()
 
 
 def test_version(cli_runner):
