@@ -597,7 +597,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         for i, apply in enumerate(apply_statements):
             try:
                 parsed = squash.parse_sqlglot(apply, logger=context)
-            except squash.ParseError as e:
+            except squash.ParseError as e:  # pragma: no cover
                 context.exception("%s: %s", migration.id, str(e))
                 context.warn(apply)
                 raise typer.Exit(code=1) from e
@@ -632,7 +632,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         for rollback in reversed(rollback_statements):
             try:
                 parsed = squash.parse_sqlglot(rollback, logger=context)
-            except squash.ParseError as e:
+            except squash.ParseError as e:  # pragma: no cover
                 context.exception("%s: %s", migration.id, str(e))
                 context.warn(rollback)
                 raise typer.Exit(code=1) from e
