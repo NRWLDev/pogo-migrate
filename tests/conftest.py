@@ -1,11 +1,9 @@
-import asyncio
 import os
 import pathlib
 import re
 import textwrap
 
 import asyncpg
-import nest_asyncio
 import pytest
 import rtoml
 import typer.testing
@@ -14,16 +12,6 @@ from pogo_core.util import sql
 
 import pogo_migrate.cli
 from pogo_migrate.context import Context
-
-
-@pytest.fixture(autouse=True, scope="session")
-def _apply_nest_asyncio():
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    nest_asyncio.apply(loop)
-    try:
-        yield
-    finally:
-        loop.close()
 
 
 @pytest.fixture(autouse=True)

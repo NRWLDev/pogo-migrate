@@ -27,7 +27,7 @@ class Config:
     schema: str = "public"
 
     @property
-    def database_dsn(self: t.Self) -> str:
+    def database_dsn(self) -> str:
         if self.database_config is None:
             msg = "Required config `database_config` is not set."
             raise exceptions.InvalidConfigurationError(msg)

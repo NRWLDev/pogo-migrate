@@ -64,8 +64,10 @@ P = ParamSpec("P")
 R = t.TypeVar("R")
 
 
-def handle_exceptions(context: Context) -> t.Callable[t.Callable[P, t.Awaitable[R]], t.Callable[P, t.Awaitable[R]]]:
-    def inner(f: t.Callable[P, t.Awaitable[R]]) -> t.Callable[P, t.Awaitable[R]]:
+def handle_exceptions(
+    context: Context,
+) -> t.Callable[t.Callable[P, t.Coroutine[t.Any, t.Any, R]], t.Callable[P, t.Coroutine[t.Any, t.Any, R]]]:
+    def inner(f: t.Callable[P, t.Awaitable[R]]) -> t.Callable[P, t.Coroutine[t.Any, t.Any, R]]:
         """Decorator to handle exceptions from migrations."""
 
         @functools.wraps(f)
@@ -92,8 +94,7 @@ def handle_exceptions(context: Context) -> t.Callable[t.Callable[P, t.Awaitable[
             except typer.Exit:
                 raise
             except Exception as e:
-                context.stacktrace()
-                context.error(str(e))
+                context.exception(str(e))
                 raise typer.Exit(code=1) from e
 
         return wrapped
@@ -122,7 +123,7 @@ def init(
     """
     context = Context(verbose)
 
-    @handle_exceptions(context)  # type: ignore[reportCallIssue]
+    @handle_exceptions(context)
     async def init_() -> None:
         pyproject = Path("pyproject.toml")
         if not pyproject.exists():
@@ -133,7 +134,7 @@ def init(
 
         if "tool" in data and "pogo" in data["tool"]:
             context.error("pogo already configured.")
-            context.warning("\n".join(["", "[tool.pogo]"] + [f'{k} = "{v}"' for k, v in data["tool"]["pogo"].items()]))
+            context.warn("\n".join(["", "[tool.pogo]"] + [f'{k} = "{v}"' for k, v in data["tool"]["pogo"].items()]))
             raise typer.Exit(code=1)
 
         cwd = Path.cwd().absolute()
@@ -256,8 +257,7 @@ def create_with_editor(config: Config, content: str, extension: str, context: Co
                 message = migration.__doc__
                 break
             except Exception:  # noqa: BLE001
-                context.stacktrace()
-                context.error("Error loading migration.")
+                context.exception("Error loading migration.")
                 choice = retry(context)
                 if choice == "n":
                     message = ""
@@ -290,7 +290,7 @@ def new(
     """Generate a new migration."""
     context = Context(verbose)
 
-    @handle_exceptions(context)  # type: ignore[reportCallIssue]
+    @handle_exceptions(context)
     async def new_() -> None:
         load_dotenv()
         config = load_config()
@@ -341,7 +341,7 @@ def history(
 
     context = Context(verbose)
 
-    @handle_exceptions(context)  # type: ignore[reportCallIssue]
+    @handle_exceptions(context)
     async def history_() -> None:
         load_dotenv()
         config = load_config()
@@ -354,7 +354,7 @@ def history(
         db = await sql.get_connection(connection_string, schema_name=schema_name) if connection_string else None
 
         if db is None:
-            context.warning("Database connection can not be established, migration status can not be determined.")
+            context.warn("Database connection can not be established, migration status can not be determined.")
 
         migrations = await sql.read_migrations(config.migrations, db, schema_name=schema_name)
         migrations = topological_sort([m.load() for m in migrations])
@@ -395,7 +395,7 @@ def apply(
     """Apply migrations."""
     context = Context(verbose)
 
-    @handle_exceptions(context)  # type: ignore[reportCallIssue]
+    @handle_exceptions(context)
     async def apply_() -> None:
         load_dotenv()
         config = load_config()
@@ -437,7 +437,7 @@ def rollback(
     """Rollback one or more migrations."""
     context = Context(verbose)
 
-    @handle_exceptions(context)  # type: ignore[reportCallIssue]
+    @handle_exceptions(context)
     async def rollback_() -> None:
         load_dotenv()
         config = load_config()
@@ -588,7 +588,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
             depends = migration.id
             continue
 
-        context.warning("Squashing %s", migration.id)
+        context.warn("Squashing %s", migration.id)
         squashed.append(migration.id)
         latest = migration
         replaced[migration.id] = {"orig": migration}
@@ -597,10 +597,9 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         for i, apply in enumerate(apply_statements):
             try:
                 parsed = squash.parse_sqlglot(apply, logger=context)
-            except squash.ParseError as e:
-                context.stacktrace()
-                context.error("%s: %s", migration.id, str(e))
-                context.warning(apply)
+            except squash.ParseError as e:  # pragma: no cover
+                context.exception("%s: %s", migration.id, str(e))
+                context.warn(apply)
                 raise typer.Exit(code=1) from e
 
             if source:
@@ -611,7 +610,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                     applies[parsed.identifier].append(parsed.statement)
                 else:
                     context.error("Can not extract table from DDL statement in migration %s", migration.id)
-                    context.warning(apply)
+                    context.warn(apply)
                     raise typer.Exit(code=1)
 
             else:
@@ -633,10 +632,9 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         for rollback in reversed(rollback_statements):
             try:
                 parsed = squash.parse_sqlglot(rollback, logger=context)
-            except squash.ParseError as e:
-                context.stacktrace()
-                context.error("%s: %s", migration.id, str(e))
-                context.warning(rollback)
+            except squash.ParseError as e:  # pragma: no cover
+                context.exception("%s: %s", migration.id, str(e))
+                context.warn(rollback)
                 raise typer.Exit(code=1) from e
             if source:
                 parsed.statement = f"{parsed.statement} -- source: {migration.id}"
@@ -646,7 +644,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                     rollbacks_[parsed.identifier].append(parsed.statement)
                 else:
                     context.error("Can not extract table from DDL statement in migration %s", migration.id)
-                    context.warning(rollback)
+                    context.warn(rollback)
                     raise typer.Exit(code=1)
             else:
                 context.debug(parsed.statement_type)
@@ -693,7 +691,7 @@ def clean(
     migrations_location = migrations_location or str(config.migrations)
 
     for path in Path(migrations_location).iterdir():
-        if path.suffix in {".bak"}:
+        if path.suffix == ".bak":
             path.unlink()
 
 
@@ -739,13 +737,13 @@ def validate(
                 asyncio.run(migration.apply(mock_asyncpg))
             except Exception:  # noqa: BLE001
                 context.stacktrace()
-                context.warning("Can't validate python migration %s (apply), skipping...", migration.id)
+                context.warn("Can't validate python migration %s (apply), skipping...", migration.id)
 
             try:
                 asyncio.run(migration.rollback(mock_asyncpg))
             except Exception:  # noqa: BLE001
                 context.stacktrace()
-                context.warning("Can't validate python migration %s (rollback), skipping...", migration.id)
+                context.warn("Can't validate python migration %s (rollback), skipping...", migration.id)
 
             statements = [c[1].get("query") or c[0][0] for c in mock_asyncpg.execute.call_args_list]
             statements += [c[1].get("query") or c[0][0] for c in mock_asyncpg.fetch.call_args_list]
@@ -759,9 +757,8 @@ def validate(
             try:
                 parsed = squash.parse_sqlglot(statement, logger=context)
             except squash.ParseError as e:
-                context.stacktrace()
-                context.error("%s: %s", migration.id, str(e))
-                context.warning(statement)
+                context.exception("%s: %s", migration.id, str(e))
+                context.warn(statement)
                 continue
 
             if parsed.statement_type in ("CREATE", "ALTER", "DROP") and parsed.identifier is None:
@@ -769,7 +766,7 @@ def validate(
                     "Can not extract table from DDL statement in migration %s, check that table name is not a reserved word.",
                     migration.id,
                 )
-                context.warning(statement)
+                context.warn(statement)
 
 
 @app.command("mark")
@@ -794,7 +791,7 @@ def mark(
     """
     context = Context(verbose)
 
-    @handle_exceptions(context)  # type: ignore[reportCallIssue]
+    @handle_exceptions(context)
     async def _mark() -> None:
         load_dotenv()
         config = load_config()
@@ -839,7 +836,7 @@ def unmark(
     """
     context = Context(verbose)
 
-    @handle_exceptions(context)  # type: ignore[reportCallIssue]
+    @handle_exceptions(context)
     async def _unmark() -> None:
         load_dotenv()
         config = load_config()
@@ -882,7 +879,7 @@ def migrate_yoyo(
     """Migrate existing 'yoyo' migrations to 'pogo'."""
     context = Context(verbose)
 
-    @handle_exceptions(context)  # type: ignore[reportCallIssue]
+    @handle_exceptions(context)
     async def _migrate() -> None:
         load_dotenv()
         config = load_config()

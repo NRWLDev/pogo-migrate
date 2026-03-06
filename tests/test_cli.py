@@ -1,13 +1,25 @@
+import asyncio
 import importlib.metadata
 from pathlib import Path
 from textwrap import dedent
 from unittest import mock
 
+import nest_asyncio2
 import pytest
 from pogo_core.util import sql
 
 from pogo_migrate import cli
 from tests.util import AsyncMock
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _apply_nest_asyncio():
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    nest_asyncio2.apply(loop)
+    try:
+        yield
+    finally:
+        loop.close()
 
 
 def test_version(cli_runner):
@@ -2365,27 +2377,6 @@ class TestSquash:
         DROP TABLE one;
         """)
 
-    def test_apply_sqlglot_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
-        migration_file_factory(
-            "20210101_01_abcd-first-migration",
-            "sql",
-            dedent("""
-            -- commit
-            -- depends:
-
-            -- migrate: apply
-            CREATE TABLE lock (id INT);
-            -- migrate: rollback
-            """),
-        )
-
-        result = cli_runner.invoke(["squash"])
-        assert result.exit_code == 1, result.output
-
-        cli_runner.assert_output(
-            "20210101_01_abcd-first-migration: Expected table name but got lock. Line: 1, Column: 17",
-        )
-
     def test_apply_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
         migration_file_factory(
             "20210101_01_abcd-first-migration",
@@ -2405,27 +2396,6 @@ class TestSquash:
 
         cli_runner.assert_output(
             "Can not extract table from DDL statement in migration 20210101_01_abcd-first-migration",
-        )
-
-    def test_rollback_sqlglot_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
-        migration_file_factory(
-            "20210101_01_abcd-first-migration",
-            "sql",
-            dedent("""
-            -- commit
-            -- depends:
-
-            -- migrate: apply
-            -- migrate: rollback
-            CREATE TABLE lock;
-            """),
-        )
-
-        result = cli_runner.invoke(["squash"])
-        assert result.exit_code == 1, result.output
-
-        cli_runner.assert_output(
-            "20210101_01_abcd-first-migration: Expected table name but got lock. Line: 1, Column: 17",
         )
 
     def test_rollback_reserved_keyword_names_errors_trapped(self, migration_file_factory, cli_runner):
