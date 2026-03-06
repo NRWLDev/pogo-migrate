@@ -109,6 +109,7 @@ env = [
 ]
 filterwarnings = [
     "ignore:.*pogo_core.*:FutureWarning",
+    "ignore:'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16:DeprecationWarning",
 ]
 markers = [
     "nosync: don't apply pogo system tables to the database prior to the test",

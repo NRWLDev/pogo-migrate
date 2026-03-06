@@ -1,7 +1,7 @@
 from pogo_core.error import BadMigrationError
 
 
-class InvalidConfigurationError(Exception): ...
+class InvalidConfigurationError(Exception): ...  # pragma: no cover
 
 
 __all__ = [
