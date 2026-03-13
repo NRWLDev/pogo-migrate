@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.4.2 (released 2026-03-13)
+
+### Miscellaneous
+
+- Add ty pre-commit [[26f9f21](https://github.com/NRWLDev/pogo-migrate/commit/26f9f2100120ed366300d99280038270ec0c9158)]
+- Ignore py3.16 deprecation warning and fix missing coverage. [[e8235ad](https://github.com/NRWLDev/pogo-migrate/commit/e8235ad3e202e27c7765617c4d952335b18a267d)]
+- support py3.14 in test pipeline and add type check to style pipeline [[35b89d2](https://github.com/NRWLDev/pogo-migrate/commit/35b89d20892763b520edc63f1d03cb10f37c6e14)]
+
 ## v0.4.1 (released 2026-01-20)
 
 ### Bug fixes
