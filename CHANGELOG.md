@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.3 (released 2026-05-29)
+
+### Miscellaneous
+
+- Lock typer to a version that supports click. [[a7340dd](https://github.com/NRWLDev/pogo-migrate/commit/a7340dd91ddb940c37a4453b25cf54989de5fb5c)]
+
 ## v0.4.2 (released 2026-03-13)
 
 ### Miscellaneous
