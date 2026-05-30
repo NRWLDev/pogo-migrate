@@ -1,12 +1,13 @@
 import os
 import pathlib
 import re
+import sys
 import textwrap
+from typing import NamedTuple
 
 import asyncpg
 import pytest
 import rtoml
-import typer.testing
 from pogo_core.migration import Migration
 from pogo_core.util import sql
 
@@ -116,20 +117,24 @@ def context():
     return Context(0)
 
 
-class CliRunner(typer.testing.CliRunner):
-    target = pogo_migrate.cli.app
-    result = None
+class Result(NamedTuple):
+    exit_code: int
+    output: str
 
-    def invoke(self, *args, **kwargs):
-        result = super().invoke(self.target, *args, **kwargs)
+
+class CliRunner:
+    def __init__(self, capsys, monkeypatch):
+        self.capsys = capsys
+        self.mp = monkeypatch
+
+    def invoke(self, args):
+        self.mp.setattr(sys, "argv", ["pogo", *args])
+        with pytest.raises(SystemExit) as e:
+            pogo_migrate.cli.main()
+        captured = self.capsys.readouterr()
+        result = Result(int(str(e.value)), captured.out)
         self.result = result
-        if result.exception:
-            if isinstance(result.exception, SystemExit):
-                # The error is already properly handled. Print it and return.
-                print(result.output)  # noqa: T201
-            else:
-                raise result.exception.with_traceback(result.exc_info[2])
-        return self.result
+        return result
 
     def _clean_output(self, text: str):
         output = text.encode("ascii", errors="ignore").decode()
@@ -141,5 +146,5 @@ class CliRunner(typer.testing.CliRunner):
 
 
 @pytest.fixture
-def cli_runner():
-    return CliRunner()
+def cli_runner(capsys, monkeypatch):
+    return CliRunner(capsys, monkeypatch)

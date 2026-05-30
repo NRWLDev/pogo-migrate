@@ -503,7 +503,7 @@ wheels = [
 
 [[package]]
 name = "pogo-migrate"
-version = "0.4.2"
+version = "0.4.3"
 source = { editable = "." }
 dependencies = [
     { name = "pogo-core" },
@@ -519,6 +519,7 @@ dependencies = [
 dev = [
     { name = "asyncpg" },
     { name = "changelog-gen" },
+    { name = "click" },
     { name = "nest-asyncio2" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -539,6 +540,7 @@ dev = [
 requires-dist = [
     { name = "asyncpg", marker = "extra == 'dev'", specifier = ">=0.31.0" },
     { name = "changelog-gen", marker = "extra == 'dev'", specifier = ">=0.13" },
+    { name = "click", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "nest-asyncio2", marker = "extra == 'dev'", specifier = ">=1.6.0" },
     { name = "pogo-core", specifier = ">=0.1.2" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.7.1" },

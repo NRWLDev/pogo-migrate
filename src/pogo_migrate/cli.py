@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import asyncio
 import contextlib
 import functools
@@ -29,6 +30,9 @@ from pogo_migrate.context import Context
 from pogo_migrate.util import get_editor, make_file
 
 tempfile_prefix = "_tmp_pogonew"
+
+
+version = importlib.metadata.version("pogo-migrate")
 
 
 def load_dotenv() -> None:
@@ -93,28 +97,20 @@ def handle_exceptions(
                 return await f(*args, **kwargs)
             except typer.Exit:
                 raise
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 context.exception(str(e))
-                raise typer.Exit(code=1) from e
+                sys.exit(1)
 
         return wrapped
 
     return inner
 
 
-@app.command("init")
 def init(
-    migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
-    database_config: str = typer.Option("{POGO_DATABASE}", "-d", "--database-env-key"),
-    schema: str | None = typer.Option("public", help="Default schema name."),
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    migrations_location: str,
+    database_env_key: str,
+    schema: str | None,
+    verbose: int,
 ) -> None:
     """Initiate pogo configuration.
 
@@ -135,22 +131,22 @@ def init(
         if "tool" in data and "pogo" in data["tool"]:
             context.error("pogo already configured.")
             context.warn("\n".join(["", "[tool.pogo]"] + [f'{k} = "{v}"' for k, v in data["tool"]["pogo"].items()]))
-            raise typer.Exit(code=1)
+            sys.exit(1)
 
         cwd = Path.cwd().absolute()
         p = Path(migrations_location).resolve().absolute()
 
         try:
             loc = p.relative_to(cwd)
-        except ValueError as e:
+        except ValueError:
             context.error("migrations_location is not a child of current location.")
-            raise typer.Exit(code=1) from e
+            sys.exit(1)
 
         data = {
             "tool": {
                 "pogo": {
                     "migrations": f"./{loc}",
-                    "database_config": database_config,
+                    "database_config": database_env_key,
                     "schema": schema,
                 },
             },
@@ -272,20 +268,12 @@ def create_with_editor(config: Config, content: str, extension: str, context: Co
             Path(tmpfile.name).unlink()
 
 
-@app.command("new")
 def new(
-    message_: str = typer.Option("", "-m", "--message", help="Message describing focus of the migration."),
+    message_: str,
     *,
-    interactive: bool = typer.Option(True, help="Open migration for editing."),  # noqa: FBT003
-    py_: bool = typer.Option(False, "--py", help="Generate a python migration."),  # noqa: FBT003
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    interactive: bool,
+    py_: bool,
+    verbose: int,
 ) -> None:
     """Generate a new migration."""
     context = Context(verbose)
@@ -318,21 +306,13 @@ def new(
     asyncio.run(new_())
 
 
-@app.command("history")
 def history(
-    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
+    database: str | None,
     *,
-    schema: str | None = typer.Option(None, help="Schema override."),
-    unapplied: bool = typer.Option(False, help="Show only unapplied migrations."),  # noqa: FBT003
-    simple: bool = typer.Option(False, help="Show raw data without tabulation."),  # noqa: FBT003
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    schema: str | None,
+    unapplied: bool,
+    simple: bool,
+    verbose: int,
 ) -> None:
     """List migration history.
 
@@ -911,3 +891,124 @@ def migrate_yoyo(
         await yoyo.copy_yoyo_migration_history(context, db)
 
     asyncio.run(_migrate())
+
+
+# class CustomHelpFormatter(argparse.HelpFormatter):
+#     def _get_help_string(self, action):
+#         help = action.help
+#         if action.default is not argparse.SUPPRESS:
+#             help += f' (default: {action.default})'
+#         return help
+# parser = argparse.ArgumentParser(description="GeeksforGeeks argparse Example 2",
+#                                  formatter_class=CustomHelpFormatter)
+
+# Build argparser
+
+parser = argparse.ArgumentParser(prog="pogo", usage="pogo [OPTIONS] COMMAND [ARGS]...")
+parser.add_argument("--version", action="version", version=f"%(prog)s {version}")
+
+parent_parser = argparse.ArgumentParser(add_help=False)
+parent_parser.add_argument(
+    "-v",
+    "--verbose",
+    help="Verbose output. Use multiple times to increase level of verbosity.",
+    action="count",
+    default=0,
+)
+
+commands = parser.add_subparsers(title="commands", dest="command")
+
+# Create command parsers
+_init = commands.add_parser("init", parents=[parent_parser], help="Initiate pogo configuration.")
+_new = commands.add_parser("new", help="Generate a new migration.", parents=[parent_parser])
+_history = commands.add_parser("history", help="List migration history.", parents=[parent_parser])
+_apply = commands.add_parser("apply", help="Apply migrations.", parents=[parent_parser])
+_rollback = commands.add_parser("rollback", help="Rollback one or more migrations.", parents=[parent_parser])
+_remove = commands.add_parser("remove", help="Remove a migration from the dependency chain.", parents=[parent_parser])
+_squash = commands.add_parser("squash", help="Squash migrations [EXPERIMENTAL].", parents=[parent_parser])
+_clean = commands.add_parser(
+    "clean",
+    help="Clean the migration directory of .bak migrations from squash.",
+    parents=[parent_parser],
+)
+_validate = commands.add_parser("validate", help="Validate migrations [EXPERIMENTAL].", parents=[parent_parser])
+_mark = commands.add_parser("mark", help="Mark migrations as applied, without running.", parents=[parent_parser])
+_unmark = commands.add_parser(
+    "unmark",
+    help="Mark migrations as unapplied, without rolling back.",
+    parents=[parent_parser],
+)
+_yoyo = commands.add_parser(
+    "migrate-yoyo",
+    help="Migrate existing 'yoyo' migrations to 'pogo'.",
+    parents=[parent_parser],
+)
+
+# Generate command arguments
+_init.add_argument("-m", "--migrations-location", default="./migrations")
+_init.add_argument("-d", "--database-env-key", default="{POGO_DATABASE}")
+_init.add_argument("--schema", help="Default schema name.", default="public")
+
+_new.add_argument(
+    "-m",
+    "--message",
+    help="Message describing focus of the migration.",
+    default="",
+    dest="message_",
+)
+_new.add_argument(
+    "--interactive",
+    action=argparse.BooleanOptionalAction,
+    help="Open migration for editing.",
+    default=True,
+)
+_new.add_argument(
+    "--py",
+    action=argparse.BooleanOptionalAction,
+    help="Generate a python migration",
+    default=False,
+    dest="py_",
+)
+
+_history.add_argument(
+    "-d",
+    "--database",
+    help="Database connection string.",
+)
+_history.add_argument(
+    "--schema",
+    help="Schema override.",
+)
+_history.add_argument(
+    "--unapplied",
+    action=argparse.BooleanOptionalAction,
+    help="Show only unapplied migrations.",
+    default=False,
+)
+_history.add_argument(
+    "--simple",
+    action=argparse.BooleanOptionalAction,
+    help="Show raw data without tabulation.",
+    default=False,
+)
+
+# Assign command functions
+_init.set_defaults(func=init)
+_new.set_defaults(func=new)
+_history.set_defaults(func=history)
+_apply.set_defaults(func=apply)
+_rollback.set_defaults(func=rollback)
+_remove.set_defaults(func=remove)
+_squash.set_defaults(func=squash_)
+_clean.set_defaults(func=clean)
+_validate.set_defaults(func=validate)
+_mark.set_defaults(func=mark)
+_unmark.set_defaults(func=unmark)
+_yoyo.set_defaults(func=migrate_yoyo)
+
+
+def main() -> None:
+    """Bump package version."""
+    args = parser.parse_args()
+    kwargs = {k: v for k, v in vars(args).items() if k not in {"command", "func"}}
+    args.func(**kwargs)
