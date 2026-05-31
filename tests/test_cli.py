@@ -1,5 +1,7 @@
 import asyncio
 import importlib.metadata
+import io
+import sys
 from pathlib import Path
 from textwrap import dedent
 from unittest import mock
@@ -47,6 +49,37 @@ def pyproject_no_database(pyproject_factory, migrations):  # noqa: ARG001
 @pytest.fixture(autouse=True)
 def _db_patch(db_session, monkeypatch):
     monkeypatch.setattr(sql.asyncpg, "connect", AsyncMock(return_value=db_session))
+
+
+class TestHelpers:
+    @pytest.mark.parametrize(
+        ("default", "stdin", "expected"),
+        [
+            (None, "\ny\n", "y"),
+            ("y", "\n", "y"),
+            (None, "Y\n", "y"),
+        ],
+    )
+    def test_prompt(self, default, stdin, expected, monkeypatch):
+        monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
+        choice = cli.prompt("blah", default=default)
+        assert choice == expected
+
+    @pytest.mark.parametrize(
+        ("default", "stdin", "expected"),
+        [
+            (True, "\n", True),
+            (False, "\n", False),
+            (False, "ok\ny\n", True),
+            (False, "ok\nyes\n", True),
+            (False, "sure\nno\n", False),
+            (False, "sure\nn\n", False),
+        ],
+    )
+    def test_confirm(self, default, stdin, expected, monkeypatch):
+        monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
+        choice = cli.confirm("blah", default=default)
+        assert choice == expected
 
 
 class TestInit:
