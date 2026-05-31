@@ -809,7 +809,7 @@ def migrate_yoyo(
     asyncio.run(_migrate())
 
 
-class HelpFormatter(argparse.HelpFormatter):
+class HelpFormatter(argparse.RawDescriptionHelpFormatter):
     def _get_help_string(self, action: argparse.Action) -> str | None:
         help_ = action.help
         if help_ and action.default is not argparse.SUPPRESS:
@@ -1075,18 +1075,22 @@ _yoyo.add_argument(
 )
 
 # Assign command functions
-_init.set_defaults(func=init)
-_new.set_defaults(func=new)
-_history.set_defaults(func=history)
-_apply.set_defaults(func=apply)
-_rollback.set_defaults(func=rollback)
-_remove.set_defaults(func=remove)
-_squash.set_defaults(func=squash_)
-_clean.set_defaults(func=clean)
-_validate.set_defaults(func=validate)
-_mark.set_defaults(func=mark)
-_unmark.set_defaults(func=unmark)
-_yoyo.set_defaults(func=migrate_yoyo)
+for parser_, func in [
+    (_init, init),
+    (_new, new),
+    (_history, history),
+    (_apply, apply),
+    (_rollback, rollback),
+    (_remove, remove),
+    (_squash, squash_),
+    (_clean, clean),
+    (_validate, validate),
+    (_mark, mark),
+    (_unmark, unmark),
+    (_yoyo, yoyo),
+]:
+    parser_.set_defaults(func=func)
+    parser_.description = func.__doc__
 
 
 def main() -> None:

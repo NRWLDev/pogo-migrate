@@ -57,6 +57,7 @@ def infra_test_stop(context):
 
 @invoke.task
 def bump(context):
+    context.run("git-cliff --config pyproject.toml --unreleased")
     context.run("git-cliff --config pyproject.toml --bump -o CHANGELOG.md")
     result = context.run("git-cliff --bumped-version")
     x = result.stdout.splitlines()[0].lstrip("v")
