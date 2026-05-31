@@ -73,7 +73,7 @@ def handle_exceptions(
             """
             try:
                 return await f(*args, **kwargs)
-            except typer.Exit:
+            except SystemExit:
                 raise
             except Exception as e:
                 context.exception(str(e))
@@ -178,7 +178,7 @@ def retry(context: Context) -> str:
     while choice == "":
         choice = typer.prompt("Retry editing? [Ynqh]", default="y", show_default=False)
         if choice == "q":
-            raise typer.Exit(code=0)
+            raise SystemExit(0)
         if choice in "yn":
             return choice
         if choice == "h":
@@ -514,7 +514,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
             except squash.ParseError as e:  # pragma: no cover
                 context.exception("%s: %s", migration.id, str(e))
                 context.warn(apply)
-                raise typer.Exit(code=1) from e
+                raise SystemExit(1) from e
 
             if source:
                 parsed.statement = f"{parsed.statement} -- source: {migration.id}"
@@ -525,7 +525,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                 else:
                     context.error("Can not extract table from DDL statement in migration %s", migration.id)
                     context.warn(apply)
-                    raise typer.Exit(code=1)
+                    raise SystemExit(1)
 
             else:
                 keep = True
@@ -549,7 +549,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
             except squash.ParseError as e:  # pragma: no cover
                 context.exception("%s: %s", migration.id, str(e))
                 context.warn(rollback)
-                raise typer.Exit(code=1) from e
+                raise SystemExit(1) from e
             if source:
                 parsed.statement = f"{parsed.statement} -- source: {migration.id}"
 
@@ -559,7 +559,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                 else:
                     context.error("Can not extract table from DDL statement in migration %s", migration.id)
                     context.warn(rollback)
-                    raise typer.Exit(code=1)
+                    raise SystemExit(1)
             else:
                 context.debug(parsed.statement_type)
                 rollbacks_["__data"].append(parsed.statement)
