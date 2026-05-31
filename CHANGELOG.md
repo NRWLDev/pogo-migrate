@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.5 - 2026-05-31
+
+### Miscellaneous
+
+- Include function docstring as cli command functions. [[aed64c9](https://github.com/NRWLDev/pogo/commit/aed64c938155b87113fc61344bf6bca2ac1fd720)]
+
 ## v0.4.4 - 2026-05-31
 
 ### Miscellaneous
