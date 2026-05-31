@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.4 - 2026-05-31
+
+### Miscellaneous
+
+- Drop dependency on typer/click for cli. [#58](https://github.com/NRWLDev/pogo-migrate/issues/58)  [[5bd11ca](https://github.com/NRWLDev/pogo/commit/5bd11caff320e5bca91b42379bfea5fb8d88512e)]
+
 ## v0.4.3 - 2026-05-29
 
 ### Miscellaneous

@@ -1,6 +1,6 @@
 [project]
 name = "pogo-migrate"
-version = "0.4.3"
+version = "0.4.4"
 description = "Database migration tool for asyncpg"
 readme = "README.md"
 authors = [
@@ -68,7 +68,7 @@ dev = [
 pogo = "pogo_migrate.cli:main"
 
 [tool.bumpversion]
-current_version = "0.4.3"
+current_version = "0.4.4"
 allow_dirty = true
 allow_missing = true
 commit_extra = ["CHANGELOG.md"]
