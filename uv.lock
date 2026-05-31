@@ -512,7 +512,6 @@ dependencies = [
     { name = "sqlglot" },
     { name = "sqlparse" },
     { name = "tabulate" },
-    { name = "typer-slim" },
 ]
 
 [package.optional-dependencies]
@@ -556,7 +555,6 @@ requires-dist = [
     { name = "sqlparse", specifier = ">=0.5.2" },
     { name = "tabulate", specifier = ">=0.9.0" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.17" },
-    { name = "typer-slim", specifier = "<0.25.0" },
 ]
 provides-extras = ["dev"]
 
