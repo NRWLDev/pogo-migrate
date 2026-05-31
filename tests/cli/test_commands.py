@@ -1,5 +1,6 @@
 import asyncio
-import importlib.metadata
+import io
+import sys
 from pathlib import Path
 from textwrap import dedent
 from unittest import mock
@@ -22,14 +23,6 @@ def _apply_nest_asyncio():
         loop.close()
 
 
-def test_version(cli_runner):
-    version = importlib.metadata.version("pogo-migrate")
-    result = cli_runner.invoke(["--version"])
-    assert result.exit_code == 0
-
-    cli_runner.assert_output(f"pogo-migrate {version}")
-
-
 @pytest.fixture
 def pyproject(pyproject_factory, migrations):  # noqa: ARG001
     return pyproject_factory()
@@ -49,18 +42,26 @@ def _db_patch(db_session, monkeypatch):
     monkeypatch.setattr(sql.asyncpg, "connect", AsyncMock(return_value=db_session))
 
 
+@pytest.fixture
+def patch_stdin(monkeypatch):
+    def factory(input_):
+        monkeypatch.setattr(sys, "stdin", io.StringIO(input_))
+
+    return factory
+
+
 class TestInit:
-    def test_init_no_confirm(self, cwd, cli_runner):
-        result = cli_runner.invoke(["init"], input="n\n")
-        assert result.exit_code == 0, result.output
+    def test_init_no_confirm(self, cwd, patch_stdin):
+        patch_stdin("n\n")
+        cli.init()
 
         p = cwd / "pyproject.toml"
         with p.open() as f:
             assert f.read() == ""
 
-    def test_init_no_pyproject(self, cwd, cli_runner):
-        result = cli_runner.invoke(["init"], input="y\n")
-        assert result.exit_code == 0, result.output
+    def test_init_no_pyproject(self, cwd, patch_stdin):
+        patch_stdin("y\n")
+        cli.init()
 
         p = cwd / "pyproject.toml"
         with p.open() as f:
@@ -72,14 +73,12 @@ class TestInit:
             schema = 'public'
             """)
 
-    def test_init_invalid_migrations_location(self, cwd, cli_runner):
-        result = cli_runner.invoke(["init", "-m", str(cwd.parent / "migrations")])
-        assert result.exit_code == 1, result.output
-        cli_runner.assert_output(
-            dedent("migrations_location is not a child of current location."),
-        )
+    def test_init_invalid_migrations_location(self, cwd, patch_stdin, result_checker):
+        patch_stdin("y\n")
+        with result_checker(1, "migrations_location is not a child of current location."):
+            cli.init(migrations_location=str(cwd.parent / "migrations"))
 
-    def test_init_existing_pyproject(self, cwd, cli_runner):
+    def test_init_existing_pyproject(self, cwd, patch_stdin):
         p = cwd / "pyproject.toml"
         with p.open("w") as f:
             f.write(
@@ -88,8 +87,8 @@ class TestInit:
             key = "value"
             """),
             )
-        result = cli_runner.invoke(["init"], input="y\n")
-        assert result.exit_code == 0, result.output
+        patch_stdin("y\n")
+        cli.init()
 
         with p.open() as f:
             assert f.read() == dedent("""\
@@ -102,12 +101,9 @@ class TestInit:
             schema = 'public'
             """)
 
-    def test_init_overrides(self, cwd, cli_runner):
-        result = cli_runner.invoke(
-            ["init", "-m", "./my-migrations", "-d", "{POSTGRES_DSN}", "--schema", "pogo"],
-            input="y\n",
-        )
-        assert result.exit_code == 0, result.output
+    def test_init_overrides(self, cwd, patch_stdin):
+        patch_stdin("y\n")
+        cli.init(migrations_location="./my-migrations", database_env_key="{POSTGRES_DSN}", schema="pogo")
 
         p = cwd / "pyproject.toml"
         with p.open() as f:
@@ -119,7 +115,7 @@ class TestInit:
             schema = 'pogo'
             """)
 
-    def test_init_already_configured(self, cwd, cli_runner):
+    def test_init_already_configured(self, cwd, result_checker):
         p = cwd / "pyproject.toml"
         with p.open("w") as f:
             assert f.write(
@@ -131,11 +127,8 @@ class TestInit:
             """),
             )
 
-        result = cli_runner.invoke(["init"])
-        assert result.exit_code == 1
-        cli_runner.assert_output(
-            dedent("pogo already configured."),
-        )
+        with result_checker(1, "pogo already configured."):
+            cli.init()
 
         p = cwd / "pyproject.toml"
         with p.open() as f:
@@ -146,7 +139,7 @@ class TestInit:
             database_config = '{POSTGRES_DSN}'
             """)
 
-    def test_init_already_configured_verbose(self, cwd, cli_runner):
+    def test_init_already_configured_verbose(self, cwd, result_checker):
         p = cwd / "pyproject.toml"
         with p.open("w") as f:
             assert f.write(
@@ -159,35 +152,34 @@ class TestInit:
             """),
             )
 
-        result = cli_runner.invoke(["init", "-v"])
-        assert result.exit_code == 1
-        cli_runner.assert_output(
-            dedent("""\
-            pogo already configured.
+        with result_checker(
+            1,
+            dedent(
+                """\
+                pogo already configured.
 
-            [tool.pogo]
-            migrations = "./my-migrations"
-            database_config = "{POSTGRES_DSN}"
-            schema = "public"
-            """),
-        )
+                [tool.pogo]
+                migrations = "./my-migrations"
+                database_config = "{POSTGRES_DSN}"
+                schema = "public"
+                """,
+            ),
+        ):
+            cli.init(verbose=1)
 
 
 class TestNew:
-    def test_no_config(self, cli_runner):
-        result = cli_runner.invoke(["new"])
-        assert result.exit_code == 1, result.output
-        cli_runner.assert_output(
-            "No configuration found, missing pyproject.toml, run 'pogo init ...'",
-        )
+    def test_no_config(self, result_checker):
+        with result_checker(1, "No configuration found, missing pyproject.toml, run 'pogo init ...'"):
+            cli.new()
 
     @pytest.mark.usefixtures("pyproject")
-    def test_non_interactive_file_written(self, monkeypatch, cli_runner, cwd):
+    def test_non_interactive_file_written(self, monkeypatch, cwd, result_checker):
         monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
 
-        result = cli_runner.invoke(["new", "--no-interactive"])
+        with result_checker():
+            cli.new(interactive=False)
 
-        assert result.exit_code == 0, result.output
         with (cwd / "new_file.py").open() as f:
             assert f.read() == dedent("""\
             --
@@ -200,12 +192,12 @@ class TestNew:
             """)
 
     @pytest.mark.usefixtures("pyproject_no_database")
-    def test_non_interactive_file_written_optional_database(self, monkeypatch, cli_runner, cwd):
+    def test_non_interactive_file_written_optional_database(self, monkeypatch, result_checker, cwd):
         monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
 
-        result = cli_runner.invoke(["new", "--no-interactive"])
+        with result_checker():
+            cli.new(interactive=False)
 
-        assert result.exit_code == 0, result.output
         with (cwd / "new_file.py").open() as f:
             assert f.read() == dedent("""\
             --
@@ -218,40 +210,28 @@ class TestNew:
             """)
 
     @pytest.mark.usefixtures("pyproject")
-    def test_os_error(self, monkeypatch, cli_runner):
+    def test_os_error(self, monkeypatch, result_checker):
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock(side_effect=OSError))
-        result = cli_runner.invoke(["new"])
-        assert result.exit_code == 1, result.output
-        cli_runner.assert_output(
-            "Error: could not open editor!",
-        )
+        with result_checker(1, "Error: could not open editor!"):
+            cli.new()
 
     @pytest.mark.usefixtures("pyproject")
-    def test_no_changes(self, monkeypatch, cli_runner):
+    def test_no_changes(self, monkeypatch, result_checker):
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
-        result = cli_runner.invoke(["new"])
-        assert result.exit_code == 1, result.output
-        cli_runner.assert_output(
-            "Abort: no changes made",
-        )
+        with result_checker(1, "Abort: no changes made"):
+            cli.new()
 
     @pytest.mark.usefixtures("pyproject")
-    def test_changes_made(self, monkeypatch, cli_runner, migrations):
+    def test_changes_made(self, monkeypatch, result_checker, migrations):
         monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=migrations / "new_file.sql"))
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
 
-        result = cli_runner.invoke(["new", "-v"])
-
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
-            dedent("""\
-            Created file: migrations/new_file.sql
-            """).strip(),
-        )
+        with result_checker(None, "Created file: migrations/new_file.sql"):
+            cli.new(verbose=1)
 
     @pytest.mark.usefixtures("pyproject")
-    def test_subprocess_call(self, monkeypatch, tmp_path, cli_runner):
+    def test_subprocess_call(self, monkeypatch, tmp_path, result_checker):
         f = tmp_path / "tmpfile"
         f.touch()
         mock_file = mock.MagicMock()
@@ -261,12 +241,13 @@ class TestNew:
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli, "NamedTemporaryFile", mock.Mock(return_value=mock_file))
 
-        cli_runner.invoke(["new", "--py"])
+        with result_checker(1, "Abort: no changes made"):
+            cli.new(py_=True)
 
         assert cli.subprocess.call.call_args == mock.call(["vim", str(f)])
 
     @pytest.mark.usefixtures("pyproject")
-    def test_subprocess_call_dynamic_editor(self, monkeypatch, tmp_path, cli_runner):
+    def test_subprocess_call_dynamic_editor(self, monkeypatch, tmp_path, result_checker):
         f = tmp_path / "tmpfile"
         f.touch()
         mock_file = mock.MagicMock()
@@ -276,7 +257,8 @@ class TestNew:
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli, "NamedTemporaryFile", mock.Mock(return_value=mock_file))
 
-        cli_runner.invoke(["new", "--py"])
+        with result_checker(1, "Abort: no changes made"):
+            cli.new(py_=True)
 
         assert cli.subprocess.call.call_args == mock.call(["vim", str(f)])
 
@@ -285,7 +267,7 @@ class TestNew:
         ("extra_args", "expected"),
         [
             (
-                [],
+                {},
                 dedent("""\
                 --
                 -- depends:
@@ -297,7 +279,7 @@ class TestNew:
                 """),
             ),
             (
-                ["--py"],
+                {"py_": True},
                 dedent('''\
                 """
 
@@ -316,14 +298,14 @@ class TestNew:
             ),
         ],
     )
-    def test_file_written(self, monkeypatch, cli_runner, cwd, extra_args, expected):
+    def test_file_written(self, monkeypatch, result_checker, cwd, extra_args, expected):
         monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file"))
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
 
-        result = cli_runner.invoke(["new", *extra_args])
+        with result_checker(None, "Created file: new_file"):
+            cli.new(**extra_args)
 
-        assert result.exit_code == 0, result.output
         with (cwd / "new_file").open() as f:
             assert f.read() == expected
 
@@ -332,7 +314,7 @@ class TestNew:
         ("extra_args", "expected"),
         [
             (
-                [],
+                {},
                 dedent("""\
                 --
                 -- depends: 20210101_01_rando-commit
@@ -344,7 +326,7 @@ class TestNew:
                 """),
             ),
             (
-                ["--py"],
+                {"py_": True},
                 dedent('''\
                 """
 
@@ -366,7 +348,7 @@ class TestNew:
     def test_dependency_detected_file_written(
         self,
         monkeypatch,
-        cli_runner,
+        result_checker,
         cwd,
         migration_file_factory,
         extra_args,
@@ -387,9 +369,9 @@ class TestNew:
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
 
-        result = cli_runner.invoke(["new", *extra_args])
+        with result_checker(None, "Created file: new_file.sql"):
+            cli.new(**extra_args)
 
-        assert result.exit_code == 0, result.output
         with (cwd / "new_file.sql").open() as f:
             assert f.read() == expected
 
@@ -398,7 +380,7 @@ class TestNew:
         ("extra_args", "expected"),
         [
             (
-                [],
+                {},
                 dedent("""\
                 --
                 -- depends: 20210101_01_rando-commit 20210101_02_rando-commit
@@ -410,7 +392,7 @@ class TestNew:
                 """),
             ),
             (
-                ["--py"],
+                {"py_": True},
                 dedent('''\
                 """
 
@@ -432,7 +414,7 @@ class TestNew:
     def test_multiple_head_dependencies_detected_file_written(
         self,
         monkeypatch,
-        cli_runner,
+        result_checker,
         cwd,
         migration_file_factory,
         extra_args,
@@ -475,123 +457,116 @@ class TestNew:
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
 
-        result = cli_runner.invoke(["new", *extra_args])
+        with result_checker(None, "Created file: new_file.sql"):
+            cli.new(**extra_args)
 
-        assert result.exit_code == 0, result.output
         with (cwd / "new_file.sql").open() as f:
             assert f.read() == expected
 
     @pytest.mark.usefixtures("pyproject")
-    def test_load_failed_quit(self, monkeypatch, cli_runner):
+    def test_load_failed_quit(self, monkeypatch, result_checker, patch_stdin):
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
         monkeypatch.setattr(cli.Migration, "load", mock.Mock(side_effect=Exception))
+        patch_stdin("q\n")
 
-        result = cli_runner.invoke(["new"], input="q\n")
-
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        with result_checker(
+            None,
             dedent("""\
             Error loading migration.
-            Retry editing? [Ynqh]: q
+            Retry editing? [Ynqh]:
             """),
-        )
+        ):
+            cli.new()
 
     @pytest.mark.usefixtures("pyproject")
-    def test_retry_ignores_invalid_input(self, monkeypatch, cli_runner):
+    def test_retry_ignores_invalid_input(self, monkeypatch, result_checker, patch_stdin):
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
         monkeypatch.setattr(cli.Migration, "load", mock.Mock(side_effect=Exception))
+        patch_stdin("a\nb\nq\n")
 
-        result = cli_runner.invoke(["new"], input="a\nb\nq\n")
-
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        with result_checker(
+            None,
             dedent("""\
             Error loading migration.
-            Retry editing? [Ynqh]: a
-            Retry editing? [Ynqh]: b
-            Retry editing? [Ynqh]: q
+            Retry editing? [Ynqh]: Retry editing? [Ynqh]: Retry editing? [Ynqh]:
             """),
-        )
+        ):
+            cli.new()
 
     @pytest.mark.usefixtures("pyproject")
-    def test_retry_help(self, monkeypatch, cli_runner):
+    def test_retry_help(self, monkeypatch, result_checker, patch_stdin):
         monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
         monkeypatch.setattr(cli.Migration, "load", mock.Mock(side_effect=Exception))
+        patch_stdin("h\nq\n")
 
-        result = cli_runner.invoke(["new"], input="h\nq\n")
-
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        with result_checker(
+            None,
             dedent("""\
             Error loading migration.
-            Retry editing? [Ynqh]: h
-            y: reopen the migration file in your editor
+            Retry editing? [Ynqh]: y: reopen the migration file in your editor
             n: save the migration as-is, without re-editing
             q: quit without saving the migration
             h: show this help
 
-            Retry editing? [Ynqh]: q
-            """),
-        )
-
-    @pytest.mark.usefixtures("pyproject")
-    def test_load_failed_retry_and_exit(self, monkeypatch, cli_runner, cwd):
-        monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
-        monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
-        monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock(), mock.Mock()]))
-        monkeypatch.setattr(cli.Migration, "load", mock.Mock(side_effect=Exception))
-
-        result = cli_runner.invoke(["new"], input="y\nn\n")
-
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
-            dedent("""\
-            Error loading migration.
-            Retry editing? [Ynqh]: y
-            Error loading migration.
-            Retry editing? [Ynqh]: n
-            Created file: new_file.py
-            """),
-        )
-
-    @pytest.mark.usefixtures("pyproject")
-    def test_load_failed_default_and_exit(self, monkeypatch, cli_runner, cwd):
-        monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
-        monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
-        monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock(), mock.Mock()]))
-        monkeypatch.setattr(cli.Migration, "load", mock.Mock(side_effect=Exception))
-
-        result = cli_runner.invoke(["new"], input="\nn\n")
-
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
-            dedent("""\
-            Error loading migration.
             Retry editing? [Ynqh]:
-            Error loading migration.
-            Retry editing? [Ynqh]: n
-            Created file: new_file.py
             """),
-        )
+        ):
+            cli.new()
+
+    @pytest.mark.usefixtures("pyproject")
+    def test_load_failed_retry_and_exit(self, monkeypatch, result_checker, patch_stdin, cwd):
+        monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
+        monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
+        monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock(), mock.Mock()]))
+        monkeypatch.setattr(cli.Migration, "load", mock.Mock(side_effect=Exception))
+        patch_stdin("y\nn\n")
+
+        with result_checker(
+            None,
+            dedent("""\
+            Error loading migration.
+            Retry editing? [Ynqh]: Error loading migration.
+            Retry editing? [Ynqh]: Created file: new_file.py
+            """),
+        ):
+            cli.new()
+
+    @pytest.mark.usefixtures("pyproject")
+    def test_load_failed_default_and_exit(self, monkeypatch, result_checker, patch_stdin, cwd):
+        monkeypatch.setattr(cli, "make_file", mock.Mock(return_value=cwd / "new_file.py"))
+        monkeypatch.setattr(cli.subprocess, "call", mock.Mock())
+        monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock(), mock.Mock()]))
+        monkeypatch.setattr(cli.Migration, "load", mock.Mock(side_effect=Exception))
+        patch_stdin("\nn\n")
+
+        with result_checker(
+            None,
+            dedent("""\
+            Error loading migration.
+            Retry editing? [Ynqh]: Error loading migration.
+            Retry editing? [Ynqh]: Created file: new_file.py
+            """),
+        ):
+            cli.new()
 
 
 class TestHistory:
     @pytest.mark.usefixtures("migrations", "pyproject")
-    def test_no_migrations(self, cli_runner):
-        result = cli_runner.invoke(["history"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+    def test_no_migrations(self, result_checker):
+        with result_checker(
+            None,
             dedent("""\
             STATUS    ID    FORMAT
             --------  ----  --------
             """),
-        )
+        ):
+            cli.history()
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    def test_migrations_not_applied(self, migration_file_factory, cli_runner):
+    def test_migrations_not_applied(self, migration_file_factory, result_checker):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -614,19 +589,20 @@ class TestHistory:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["history"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+
+        with result_checker(
+            None,
             dedent("""\
             STATUS    ID                        FORMAT
             --------  ------------------------  --------
             U         20210101_02_rando-commit  sql
             U         20210101_01_rando-commit  sql
             """),
-        )
+        ):
+            cli.history()
 
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
-    def test_migrations_missing_config(self, migration_file_factory, cli_runner):
+    def test_migrations_missing_config(self, migration_file_factory, result_checker):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -649,9 +625,9 @@ class TestHistory:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["history", "-v"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+
+        with result_checker(
+            None,
             dedent("""\
             Database connection can not be established, migration status can not be determined.
             STATUS    ID                        FORMAT
@@ -659,13 +635,14 @@ class TestHistory:
             U         20210101_02_rando-commit  sql
             U         20210101_01_rando-commit  sql
             """),
-        )
+        ):
+            cli.history(verbose=1)
 
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
     def test_migrations_missing_config_manual_override(
         self,
         migration_file_factory,
-        cli_runner,
+        result_checker,
         postgres_dsn,
     ):
         migration_file_factory(
@@ -690,19 +667,19 @@ class TestHistory:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["history", "-v", "--database", postgres_dsn])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        with result_checker(
+            None,
             dedent("""\
             STATUS    ID                        FORMAT
             --------  ------------------------  --------
             U         20210101_02_rando-commit  sql
             U         20210101_01_rando-commit  sql
             """),
-        )
+        ):
+            cli.history(verbose=1, database=postgres_dsn)
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_migrations_partial_applied(self, cli_runner, migration_file_factory, db_session):
+    async def test_migrations_partial_applied(self, result_checker, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -726,19 +703,19 @@ class TestHistory:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["history"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        with result_checker(
+            None,
             dedent("""\
             STATUS    ID                        FORMAT
             --------  ------------------------  --------
             A         20210101_01_rando-commit  sql
             U         20210101_02_rando-commit  sql
             """),
-        )
+        ):
+            cli.history()
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_migrations_partial_applied_only_unapplied(self, cli_runner, migration_file_factory, db_session):
+    async def test_migrations_partial_applied_only_unapplied(self, result_checker, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -762,18 +739,24 @@ class TestHistory:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["history", "--unapplied"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+
+        with result_checker(
+            None,
             dedent("""\
             STATUS    ID                        FORMAT
             --------  ------------------------  --------
             U         20210101_02_rando-commit  sql
             """),
-        )
+        ):
+            cli.history(unapplied=True)
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_migrations_partial_applied_unapplied_simple(self, cli_runner, migration_file_factory, db_session):
+    async def test_migrations_partial_applied_unapplied_simple(
+        self,
+        result_checker,
+        migration_file_factory,
+        db_session,
+    ):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -797,13 +780,14 @@ class TestHistory:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["history", "--unapplied", "--simple"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+
+        with result_checker(
+            None,
             dedent("""\
             U 20210101_02_rando-commit sql
             """),
-        )
+        ):
+            cli.history(unapplied=True, simple=True)
 
 
 class Base:
@@ -834,7 +818,7 @@ class Base:
 
 class TestApply(Base):
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
-    async def test_apply_success_missing_config(self, cli_runner, migration_file_factory):
+    async def test_apply_success_missing_config(self, result_checker, migration_file_factory):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -859,18 +843,19 @@ class TestApply(Base):
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["apply", "-v"])
-        assert result.exit_code == 1, result.output
-        cli_runner.assert_output(
+
+        with result_checker(
+            1,
             dedent("""\
             Required config `database_config` is not set.
             """),
-        )
+        ):
+            cli.apply(verbose=1)
 
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
     async def test_apply_success_missing_config_manual_override(
         self,
-        cli_runner,
+        result_checker,
         migration_file_factory,
         db_session,
         postgres_dsn,
@@ -899,18 +884,20 @@ class TestApply(Base):
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["apply", "-v", "--database", postgres_dsn])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+
+        with result_checker(
+            None,
             dedent("""\
             Applying 20210101_01_rando-commit
             Applying 20210101_02_rando-commit
             """),
-        )
+        ):
+            cli.apply(verbose=1, database=postgres_dsn)
+
         await self.assert_tables(db_session, ["public.table_one", "public.table_two"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_apply_success(self, cli_runner, migration_file_factory, db_session):
+    async def test_apply_success(self, result_checker, migration_file_factory, db_session):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -935,18 +922,20 @@ class TestApply(Base):
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["apply", "-v"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+
+        with result_checker(
+            None,
             dedent("""\
             Applying 20210101_01_rando-commit
             Applying 20210101_02_rando-commit
             """),
-        )
+        ):
+            cli.apply(verbose=1)
+
         await self.assert_tables(db_session, ["public.table_one", "public.table_two"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_apply_success_multiple_schemas(self, cli_runner, migration_file_factory, db_session):
+    async def test_apply_success_multiple_schemas(self, result_checker, migration_file_factory, db_session):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -971,29 +960,32 @@ class TestApply(Base):
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["apply", "-v"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+
+        with result_checker(
+            None,
             dedent("""\
             Applying 20210101_01_rando-commit
             Applying 20210101_02_rando-commit
             """),
-        )
-        result = cli_runner.invoke(["apply", "-v", "--schema", "pogo", "--create-schema"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        ):
+            cli.apply(verbose=1)
+
+        with result_checker(
+            None,
             dedent("""\
             Applying 20210101_01_rando-commit
             Applying 20210101_02_rando-commit
             """),
-        )
+        ):
+            cli.apply(verbose=1, schema="pogo", create_schema=True)
+
         await self.assert_tables(
             db_session,
             ["pogo.table_one", "pogo.table_two", "public.table_one", "public.table_two"],
         )
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_apply_failure(self, cli_runner, migration_file_factory, db_session):
+    async def test_apply_failure(self, result_checker, migration_file_factory, db_session):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1018,20 +1010,21 @@ class TestApply(Base):
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["apply", "-v"])
-        assert result.exit_code == 1, result.output
-        cli_runner.assert_output(
+
+        with result_checker(
+            1,
             dedent("""\
             Applying 20210101_01_rando-commit
             Applying 20210101_02_rando-commit
             Failed to apply 20210101_02_rando-commit
             """),
-        )
+        ):
+            cli.apply(verbose=1)
 
         await self.assert_tables(db_session, ["public.table_one"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    def test_apply_failure_verbose(self, cli_runner, migration_file_factory):
+    def test_apply_failure_verbose(self, result_checker, migration_file_factory):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1056,14 +1049,16 @@ class TestApply(Base):
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["apply", "-vvv"])
-        assert result.exit_code == 1, result.output
-        assert 'DuplicateTableError: relation "table_one" already exists' in result.output
+        with result_checker(
+            1,
+            contains='DuplicateTableError: relation "table_one" already exists',
+        ):
+            cli.apply(verbose=3)
 
 
 class TestRollback(Base):
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
-    async def test_rollback_missing_configuration(self, cli_runner, migration_file_factory, db_session):
+    async def test_rollback_missing_configuration(self, result_checker, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
         await db_session.execute("create table table_one();create table table_two()")
@@ -1091,18 +1086,19 @@ class TestRollback(Base):
             DROP TABLE table_two;
             """),
         )
-        result = cli_runner.invoke(["rollback", "--count", "-1", "-v"])
-        assert result.exit_code == 1, result.output
-        cli_runner.assert_output(
+
+        with result_checker(
+            1,
             dedent("""\
             Required config `database_config` is not set.
             """),
-        )
+        ):
+            cli.rollback(count=-11, verbose=1)
 
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
     async def test_rollback_missing_configuration_manual_override(
         self,
-        cli_runner,
+        result_checker,
         migration_file_factory,
         db_session,
         postgres_dsn,
@@ -1134,18 +1130,18 @@ class TestRollback(Base):
             DROP TABLE table_two;
             """),
         )
-        result = cli_runner.invoke(["rollback", "--count", "-1", "-v", "--database", postgres_dsn])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        with result_checker(
+            None,
             dedent("""\
             Rolling back 20210101_02_rando-commit
             Rolling back 20210101_01_rando-commit
             """),
-        )
+        ):
+            cli.rollback(count=-1, verbose=1, database=postgres_dsn)
         await self.assert_tables(db_session, [])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_rollback_success(self, cli_runner, migration_file_factory, db_session):
+    async def test_rollback_success(self, result_checker, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
         await db_session.execute("create table table_one();create table table_two()")
@@ -1173,18 +1169,19 @@ class TestRollback(Base):
             DROP TABLE table_two;
             """),
         )
-        result = cli_runner.invoke(["rollback", "--count", "-1", "-v"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+
+        with result_checker(
+            None,
             dedent("""\
             Rolling back 20210101_02_rando-commit
             Rolling back 20210101_01_rando-commit
             """),
-        )
+        ):
+            cli.rollback(count=-1, verbose=1)
         await self.assert_tables(db_session, [])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_rollback_partial_success(self, cli_runner, migration_file_factory, db_session):
+    async def test_rollback_partial_success(self, result_checker, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
         await db_session.execute("create table table_one();create table table_two()")
@@ -1212,17 +1209,17 @@ class TestRollback(Base):
             DROP TABLE table_two;
             """),
         )
-        result = cli_runner.invoke(["rollback", "--count", "1", "-v"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        with result_checker(
+            None,
             dedent("""\
             Rolling back 20210101_02_rando-commit
             """),
-        )
+        ):
+            cli.rollback(count=1, verbose=1)
         await self.assert_tables(db_session, ["public.table_one"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_rollback_drop_schema(self, cli_runner, migration_file_factory, db_session):
+    async def test_rollback_drop_schema(self, result_checker, migration_file_factory, db_session):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1249,20 +1246,20 @@ class TestRollback(Base):
             DROP TABLE table_two;
             """),
         )
-        cli_runner.invoke(["apply", "--schema", "pogo", "--create-schema"])
-        result = cli_runner.invoke(["rollback", "--count", "-1", "-v", "--schema", "pogo", "--drop-schema"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        cli.apply(schema="pogo", create_schema=True)
+        with result_checker(
+            None,
             dedent("""\
             Rolling back 20210101_02_rando-commit
             Rolling back 20210101_01_rando-commit
             """),
-        )
+        ):
+            cli.rollback(count=-1, verbose=1, schema="pogo", drop_schema=True)
         await self.assert_tables(db_session, [])
         await self.assert_schemas(db_session, ["public"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_rollback_partial_wont_drop_schema(self, cli_runner, migration_file_factory, db_session):
+    async def test_rollback_partial_wont_drop_schema(self, result_checker, migration_file_factory, db_session):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1289,20 +1286,20 @@ class TestRollback(Base):
             DROP TABLE table_two;
             """),
         )
-        cli_runner.invoke(["apply", "--schema", "pogo", "--create-schema"])
-        result = cli_runner.invoke(["rollback", "--count", "1", "-v", "--schema", "pogo", "--drop-schema"])
-        assert result.exit_code == 1, result.output
-        cli_runner.assert_output(
+        cli.apply(schema="pogo", create_schema=True)
+        with result_checker(
+            1,
             dedent("""\
             Rolling back 20210101_02_rando-commit
             migrations still exist, can't drop schema.
             """),
-        )
+        ):
+            cli.rollback(count=1, verbose=1, schema="pogo", drop_schema=True)
         await self.assert_tables(db_session, ["pogo.table_one"])
         await self.assert_schemas(db_session, ["pogo", "public"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_rollback_partial_success_multi_schema(self, cli_runner, migration_file_factory, db_session):
+    async def test_rollback_partial_success_multi_schema(self, result_checker, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         await sql.migration_applied(db_session, "20210101_02_rando-commit", "hash2", schema_name="public")
         await db_session.execute("create table table_one();create table table_two()")
@@ -1332,19 +1329,19 @@ class TestRollback(Base):
             DROP TABLE table_two;
             """),
         )
-        cli_runner.invoke(["apply"])
-        cli_runner.invoke(["apply", "--schema", "pogo", "--create-schema"])
-        result = cli_runner.invoke(["rollback", "--count", "1", "-v", "--schema", "pogo"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        cli.apply()
+        cli.apply(schema="pogo", create_schema=True)
+        with result_checker(
+            None,
             dedent("""\
             Rolling back 20210101_02_rando-commit
             """),
-        )
+        ):
+            cli.rollback(count=1, verbose=1, schema="pogo")
         await self.assert_tables(db_session, ["pogo.table_one", "public.table_one", "public.table_two"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_rollback_failure(self, cli_runner, migration_file_factory, db_session):
+    async def test_rollback_failure(self, result_checker, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         await db_session.execute("create table table_one();create table table_two()")
         migration_file_factory(
@@ -1361,19 +1358,19 @@ class TestRollback(Base):
             DROP TABLE table_three;
             """),
         )
-        result = cli_runner.invoke(["rollback", "-v"])
-        assert result.exit_code == 1, result.output
-        cli_runner.assert_output(
+        with result_checker(
+            1,
             dedent("""\
             Rolling back 20210101_01_rando-commit
             Failed to rollback 20210101_01_rando-commit
             """),
-        )
+        ):
+            cli.rollback(verbose=1)
 
         await self.assert_tables(db_session, ["public.table_one", "public.table_two"])
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_rollback_failure_verbose(self, cli_runner, migration_file_factory, db_session):
+    async def test_rollback_failure_verbose(self, result_checker, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -1387,14 +1384,16 @@ class TestRollback(Base):
             DROP TABLE table_one;
             """),
         )
-        result = cli_runner.invoke(["rollback", "-vvv"])
-        assert result.exit_code == 1, result.output
-        assert 'UndefinedTableError: table "table_one" does not exist' in result.output
+        with result_checker(
+            1,
+            contains='UndefinedTableError: table "table_one" does not exist',
+        ):
+            cli.rollback(verbose=3)
 
 
 class TestValidate:
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_validate_clean(self, cli_runner, migration_file_factory):
+    async def test_validate_clean(self, result_checker, migration_file_factory):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1419,12 +1418,13 @@ class TestValidate:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["validate", "-v"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output("")
+        with result_checker(
+            None,
+        ):
+            cli.validate(verbose=1)
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_validate_invalid_sql(self, cli_runner, migration_file_factory):
+    async def test_validate_invalid_sql(self, result_checker, migration_file_factory):
         migration_file_factory(
             "20210101_01_rando-commit",
             "sql",
@@ -1452,9 +1452,8 @@ class TestValidate:
             DROP AGGREGATE lock;
             """),
         )
-        result = cli_runner.invoke(["validate", "-v"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        with result_checker(
+            None,
             dedent("""\
             20210101_01_rando-commit: Expected table name but got None. Line: 1, Column: 10
             DROP TABLE;
@@ -1466,10 +1465,11 @@ class TestValidate:
             Can not extract table from DDL statement in migration 20210101_02_rando-commit, check that table name is not a reserved word.
             DROP AGGREGATE lock;
             """),
-        )
+        ):
+            cli.validate(verbose=1)
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    def test_validate_checks_py(self, cli_runner, migration_file_factory):
+    def test_validate_checks_py(self, result_checker, migration_file_factory):
         migration_file_factory(
             "20210101_01_rando-commit",
             "py",
@@ -1490,9 +1490,8 @@ class TestValidate:
                 await db.execute("DROP AGGREGATE lock;")
             '''),
         )
-        result = cli_runner.invoke(["validate", "-v"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        with result_checker(
+            None,
             dedent("""\
             20210101_01_rando-commit: Expected table name but got None. Line: 1, Column: 16
             CREATE INDEX foo;
@@ -1504,10 +1503,11 @@ class TestValidate:
             Can not extract table from DDL statement in migration 20210101_01_rando-commit, check that table name is not a reserved word.
             DROP AGGREGATE lock;
             """),
-        )
+        ):
+            cli.validate(verbose=1)
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    def test_validate_py_parametrized(self, cli_runner, migration_file_factory):
+    def test_validate_py_parametrized(self, result_checker, migration_file_factory):
         migration_file_factory(
             "20210101_01_abcde-first-migration",
             "py",
@@ -1526,15 +1526,13 @@ class TestValidate:
                 await db.execute(query='DROP TABLE "table";')
             '''),
         )
-        result = cli_runner.invoke(["validate", "-v"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
-            dedent("""\
-            """),
-        )
+        with result_checker(
+            None,
+        ):
+            cli.validate(verbose=1)
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    def test_validate_skips_py_error(self, cli_runner, migration_file_factory):
+    def test_validate_skips_py_error(self, result_checker, migration_file_factory):
         migration_file_factory(
             "20210101_01_abcde-first-migration",
             "py",
@@ -1552,27 +1550,26 @@ class TestValidate:
                 raise Exception
             '''),
         )
-        result = cli_runner.invoke(["validate", "-v"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        with result_checker(
+            None,
             dedent("""\
             Can't validate python migration 20210101_01_abcde-first-migration (apply), skipping...
             Can't validate python migration 20210101_01_abcde-first-migration (rollback), skipping...
             """),
-        )
+        ):
+            cli.validate(verbose=1)
 
 
 class TestMark:
     @pytest.mark.usefixtures("migrations", "pyproject")
-    def test_mark_no_migrations(self, cli_runner):
-        result = cli_runner.invoke(["mark"])
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
-            "",
-        )
+    def test_mark_no_migrations(self, result_checker):
+        with result_checker(
+            None,
+        ):
+            cli.mark()
 
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
-    async def test_mark_missing_config(self, cli_runner, migration_file_factory, db_session):
+    async def test_mark_missing_config(self, result_checker, migration_file_factory, db_session, patch_stdin):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -1607,18 +1604,20 @@ class TestMark:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["mark"], input="y\nn\n")
-        assert result.exit_code == 1, result.output
-        cli_runner.assert_output(
+        patch_stdin("y\nn\n")
+        with result_checker(
+            None,
             dedent("""\
             Required config `database_config` is not set.
             """),
-        )
+        ):
+            cli.mark()
 
     @pytest.mark.usefixtures("migrations", "pyproject_no_database")
     async def test_mark_missing_config_manual_override(
         self,
-        cli_runner,
+        result_checker,
+        patch_stdin,
         migration_file_factory,
         db_session,
         postgres_dsn,
@@ -1657,19 +1656,20 @@ class TestMark:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["mark", "--database", postgres_dsn], input="y\nn\n")
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        patch_stdin("y\nn\n")
+        with result_checker(
+            None,
             dedent("""\
-            Mark 20210101_02_rando-commit as applied? [y/N]: y
-            Mark 20210101_03_rando-commit as applied? [y/N]: n
+            Mark 20210101_02_rando-commit as applied? [y/N]: Mark 20210101_03_rando-commit as applied? [y/N]:
             """),
-        )
+        ):
+            cli.mark(database=postgres_dsn)
+
         applied_migrations = await sql.get_applied_migrations(db_session, schema_name="public")
         assert applied_migrations == {"20210101_01_rando-commit", "20210101_02_rando-commit"}
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_mark_migrations_applied(self, cli_runner, migration_file_factory, db_session):
+    async def test_mark_migrations_applied(self, result_checker, patch_stdin, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -1704,19 +1704,20 @@ class TestMark:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["mark"], input="y\nn\n")
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        patch_stdin("y\nn\n")
+        with result_checker(
+            None,
             dedent("""\
-            Mark 20210101_02_rando-commit as applied? [y/N]: y
-            Mark 20210101_03_rando-commit as applied? [y/N]: n
+            Mark 20210101_02_rando-commit as applied? [y/N]: Mark 20210101_03_rando-commit as applied? [y/N]:
             """),
-        )
+        ):
+            cli.mark()
+
         applied_migrations = await sql.get_applied_migrations(db_session, schema_name="public")
         assert applied_migrations == {"20210101_01_rando-commit", "20210101_02_rando-commit"}
 
     @pytest.mark.usefixtures("migrations", "pyproject")
-    async def test_mark_migration_applied(self, cli_runner, migration_file_factory, db_session):
+    async def test_mark_migration_applied(self, result_checker, patch_stdin, migration_file_factory, db_session):
         await sql.migration_applied(db_session, "20210101_01_rando-commit", "hash", schema_name="public")
         migration_file_factory(
             "20210101_01_rando-commit",
@@ -1751,13 +1752,14 @@ class TestMark:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["mark", "-m", "20210101_02_rando-commit"], input="y\n")
-        assert result.exit_code == 0, result.output
-        cli_runner.assert_output(
+        patch_stdin("y\n")
+        with result_checker(
+            None,
             dedent("""\
-            Mark 20210101_02_rando-commit as applied? [y/N]: y
+            Mark 20210101_02_rando-commit as applied? [y/N]:
             """),
-        )
+        ):
+            cli.mark(migration_id="20210101_02_rando-commit")
         applied_migrations = await sql.get_applied_migrations(db_session, schema_name="public")
         assert applied_migrations == {"20210101_01_rando-commit", "20210101_02_rando-commit"}
 

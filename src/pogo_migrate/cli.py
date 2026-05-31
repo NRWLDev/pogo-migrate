@@ -75,9 +75,9 @@ def handle_exceptions(
                 return await f(*args, **kwargs)
             except typer.Exit:
                 raise
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 context.exception(str(e))
-                sys.exit(1)
+                raise SystemExit(1) from e
 
         return wrapped
 
@@ -86,10 +86,10 @@ def handle_exceptions(
 
 def init(
     *,
-    migrations_location: str,
-    database_env_key: str,
-    schema: str | None,
-    verbose: int,
+    migrations_location: str = "./migrations",
+    database_env_key: str = "{POGO_DATABASE}",
+    schema: str = "public",
+    verbose: int = 0,
 ) -> None:
     """Initiate pogo configuration.
 
@@ -110,16 +110,16 @@ def init(
         if "tool" in data and "pogo" in data["tool"]:
             context.error("pogo already configured.")
             context.warn("\n".join(["", "[tool.pogo]"] + [f'{k} = "{v}"' for k, v in data["tool"]["pogo"].items()]))
-            sys.exit(1)
+            raise SystemExit(1)
 
         cwd = Path.cwd().absolute()
         p = Path(migrations_location).resolve().absolute()
 
         try:
             loc = p.relative_to(cwd)
-        except ValueError:
+        except ValueError as e:
             context.error("migrations_location is not a child of current location.")
-            sys.exit(1)
+            raise SystemExit(1) from e
 
         data = {
             "tool": {
@@ -220,11 +220,11 @@ def create_with_editor(config: Config, content: str, extension: str, context: Co
                 subprocess.call(editor)  # noqa: S603
             except OSError as e:
                 context.error("Error: could not open editor!")
-                raise typer.Exit(code=1) from e
+                raise SystemExit(1) from e
             else:
                 if Path(tmpfile.name).lstat().st_mtime == mtime:
                     context.error("Abort: no changes made")
-                    raise typer.Exit(code=1)
+                    raise SystemExit(1)
 
             try:
                 migration = Migration("temporary", Path(tmpfile.name), None)
@@ -249,10 +249,10 @@ def create_with_editor(config: Config, content: str, extension: str, context: Co
 
 def new(
     *,
-    message_: str,
-    interactive: bool,
-    py_: bool,
-    verbose: int,
+    message_: str = "",
+    interactive: bool = True,
+    py_: bool = False,
+    verbose: int = 0,
 ) -> None:
     """Generate a new migration."""
     context = Context(verbose)
@@ -277,7 +277,7 @@ def new(
             fp = make_file(config.migrations, message, extension)
             with fp.open("w", encoding="UTF-8") as f:
                 f.write(content)
-            raise typer.Exit(code=0)
+            raise SystemExit(0)
 
         p = create_with_editor(config, content, extension, context)
         context.error("Created file: %s", p.as_posix().replace(config.root_directory.as_posix(), "").lstrip("/"))
@@ -287,11 +287,11 @@ def new(
 
 def history(
     *,
-    database: str | None,
-    schema: str | None,
-    unapplied: bool,
-    simple: bool,
-    verbose: int,
+    database: str | None = None,
+    schema: str | None = None,
+    unapplied: bool = False,
+    simple: bool = False,
+    verbose: int = 0,
 ) -> None:
     """List migration history.
 
@@ -338,10 +338,10 @@ def history(
 
 def apply(
     *,
-    database: str | None,
-    schema: str | None,
-    create_schema: bool,
-    verbose: int,
+    database: str | None = None,
+    schema: str | None = None,
+    create_schema: bool = False,
+    verbose: int = 0,
 ) -> None:
     """Apply migrations."""
     context = Context(verbose)
@@ -362,11 +362,11 @@ def apply(
 
 def rollback(
     *,
-    database: str | None,
-    count: int,
-    schema: str | None,
-    drop_schema: bool,
-    verbose: int,
+    database: str | None = None,
+    count: int = 1,
+    schema: str | None = None,
+    drop_schema: bool = False,
+    verbose: int = 0,
 ) -> None:
     """Rollback one or more migrations."""
     context = Context(verbose)
@@ -393,7 +393,7 @@ def rollback(
 
             if len(applied_migrations) > 0:
                 context.error("migrations still exist, can't drop schema.")
-                raise typer.Exit(code=1)
+                raise SystemExit(1)
 
             await sql.drop_schema(db, schema_name=schema_name)
 
@@ -403,9 +403,9 @@ def rollback(
 def remove(
     *,
     migration_id: str,
-    migrations_location: str | None,
-    backup: bool,
-    verbose: int,
+    migrations_location: str | None = None,
+    backup: bool = False,
+    verbose: int = 0,
 ) -> None:
     """Remove a migration from the dependency chain."""
     context = Context(verbose)
@@ -431,12 +431,12 @@ def remove(
 
 def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
     *,
-    migrations_location: str | None,
-    backup: bool,
-    source: bool,
-    prompt_update: bool,
-    prompt_skip: bool,
-    verbose: int,
+    migrations_location: str | None = None,
+    backup: bool = False,
+    source: bool = False,
+    prompt_update: bool = False,
+    prompt_skip: bool = False,
+    verbose: int = 0,
 ) -> None:
     """Squash migrations [EXPERIMENTAL].
 
@@ -587,8 +587,8 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
 
 def clean(
     *,
-    migrations_location: str | None,
-    verbose: int,
+    migrations_location: str | None = None,
+    verbose: int = 0,
 ) -> None:
     """Clean the migration directory of .bak migrations from squash."""
     _context = Context(verbose)
@@ -603,8 +603,8 @@ def clean(
 
 def validate(
     *,
-    migrations_location: str | None,
-    verbose: int,
+    migrations_location: str | None = None,
+    verbose: int = 0,
 ) -> None:
     """Validate migrations [EXPERIMENTAL].
 
@@ -668,12 +668,12 @@ def validate(
 
 
 def mark(
-    migration_id: str | None,
-    database: str | None,
     *,
-    schema: str | None,
-    interactive: bool,
-    verbose: int,
+    migration_id: str | None = None,
+    database: str | None = None,
+    schema: str | None = None,
+    interactive: bool = True,
+    verbose: int = 0,
 ) -> None:
     """Mark migrations as applied, without running.
 
@@ -707,10 +707,10 @@ def mark(
 
 def unmark(
     *,
-    migration_id: str | None,
-    database: str | None,
-    schema: str | None,
-    verbose: int,
+    migration_id: str | None = None,
+    database: str | None = None,
+    schema: str | None = None,
+    verbose: int = 0,
 ) -> None:
     """Mark migrations as unapplied, without rolling back.
 
@@ -746,9 +746,9 @@ def unmark(
 
 def migrate_yoyo(
     *,
-    database: str | None,
-    skip_files: bool,
-    verbose: int,
+    database: str | None = None,
+    skip_files: bool = False,
+    verbose: int = 0,
 ) -> None:
     """Migrate existing 'yoyo' migrations to 'pogo'."""
     context = Context(verbose)
@@ -787,19 +787,18 @@ def migrate_yoyo(
     asyncio.run(_migrate())
 
 
-# class CustomHelpFormatter(argparse.HelpFormatter):
-#     def _get_help_string(self, action):
-#         help = action.help
-#         if action.default is not argparse.SUPPRESS:
-#             help += f' (default: {action.default})'
-#         return help
-# parser = argparse.ArgumentParser(description="GeeksforGeeks argparse Example 2",
-#                                  formatter_class=CustomHelpFormatter)
+class HelpFormatter(argparse.HelpFormatter):
+    def _get_help_string(self, action: argparse.Action) -> str | None:
+        help_ = action.help
+        if help_ and action.default is not argparse.SUPPRESS:
+            help_ += f" (default: {action.default})"
+        return help_
+
 
 # Build argparser
 
-parser = argparse.ArgumentParser(prog="pogo", usage="pogo [OPTIONS] COMMAND [ARGS]...")
-parser.add_argument("--version", action="version", version=f"%(prog)s {version}")
+parser = argparse.ArgumentParser(prog="pogo", usage="pogo [OPTIONS] COMMAND [ARGS]...", formatter_class=HelpFormatter)
+parser.add_argument("--version", action="version", version=f"pogo-migrate {version}")
 
 parent_parser = argparse.ArgumentParser(add_help=False)
 parent_parser.add_argument(
@@ -813,29 +812,72 @@ parent_parser.add_argument(
 commands = parser.add_subparsers(title="commands", dest="command")
 
 # Create command parsers
-_init = commands.add_parser("init", parents=[parent_parser], help="Initiate pogo configuration.")
-_new = commands.add_parser("new", help="Generate a new migration.", parents=[parent_parser])
-_history = commands.add_parser("history", help="List migration history.", parents=[parent_parser])
-_apply = commands.add_parser("apply", help="Apply migrations.", parents=[parent_parser])
-_rollback = commands.add_parser("rollback", help="Rollback one or more migrations.", parents=[parent_parser])
-_remove = commands.add_parser("remove", help="Remove a migration from the dependency chain.", parents=[parent_parser])
-_squash = commands.add_parser("squash", help="Squash migrations [EXPERIMENTAL].", parents=[parent_parser])
+_init = commands.add_parser(
+    "init",
+    parents=[parent_parser],
+    help="Initiate pogo configuration.",
+    formatter_class=HelpFormatter,
+)
+_new = commands.add_parser(
+    "new",
+    help="Generate a new migration.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_history = commands.add_parser(
+    "history",
+    help="List migration history.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_apply = commands.add_parser("apply", help="Apply migrations.", parents=[parent_parser], formatter_class=HelpFormatter)
+_rollback = commands.add_parser(
+    "rollback",
+    help="Rollback one or more migrations.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_remove = commands.add_parser(
+    "remove",
+    help="Remove a migration from the dependency chain.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_squash = commands.add_parser(
+    "squash",
+    help="Squash migrations [EXPERIMENTAL].",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
 _clean = commands.add_parser(
     "clean",
     help="Clean the migration directory of .bak migrations from squash.",
     parents=[parent_parser],
+    formatter_class=HelpFormatter,
 )
-_validate = commands.add_parser("validate", help="Validate migrations [EXPERIMENTAL].", parents=[parent_parser])
-_mark = commands.add_parser("mark", help="Mark migrations as applied, without running.", parents=[parent_parser])
+_validate = commands.add_parser(
+    "validate",
+    help="Validate migrations [EXPERIMENTAL].",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_mark = commands.add_parser(
+    "mark",
+    help="Mark migrations as applied, without running.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
 _unmark = commands.add_parser(
     "unmark",
     help="Mark migrations as unapplied, without rolling back.",
     parents=[parent_parser],
+    formatter_class=HelpFormatter,
 )
 _yoyo = commands.add_parser(
     "migrate-yoyo",
     help="Migrate existing 'yoyo' migrations to 'pogo'.",
     parents=[parent_parser],
+    formatter_class=HelpFormatter,
 )
 
 # Generate command arguments
@@ -1030,3 +1072,4 @@ def main() -> None:
     args = parser.parse_args()
     kwargs = {k: v for k, v in vars(args).items() if k not in {"command", "func"}}
     args.func(**kwargs)
+    raise SystemExit(0)

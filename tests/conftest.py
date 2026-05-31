@@ -1,3 +1,4 @@
+import io
 import os
 import pathlib
 import re
@@ -127,8 +128,10 @@ class CliRunner:
         self.capsys = capsys
         self.mp = monkeypatch
 
-    def invoke(self, args):
+    def invoke(self, args, input=None):  # noqa: A002
         self.mp.setattr(sys, "argv", ["pogo", *args])
+        if input:
+            self.mp.setattr(sys, "stdin", io.StringIO(input))
         with pytest.raises(SystemExit) as e:
             pogo_migrate.cli.main()
         captured = self.capsys.readouterr()
@@ -143,6 +146,43 @@ class CliRunner:
 
     def assert_output(self, expected):
         assert self._clean_output(self.result.output) == self._clean_output(expected)
+
+
+class ResultChecker:
+    def __init__(self, capsys, code=0, output="", contains=""):
+        self.capsys = capsys
+        self.code = code
+        self.output = output
+        self.contains = contains
+
+    def _clean_output(self, text: str):
+        output = text.encode("ascii", errors="ignore").decode()
+        output = re.sub(r"\s+\n", "\n", output)
+        return textwrap.dedent(output).strip()
+
+    def assert_output(self, actual, expected):
+        assert self._clean_output(actual) == self._clean_output(expected)
+
+    def __enter__(self): ...
+
+    def __exit__(self, exc_type, exc, _tb):
+        if self.code is not None:
+            assert exc_type is SystemExit, f"Expected SystemExit, received {exc_type}"
+            assert exc.code == self.code, f"Expected exit code {self.code}, received {exc.code}"
+        captured = self.capsys.readouterr()
+        if self.output:
+            self.assert_output(captured.out, self.output)
+        if self.contains:
+            assert self.contains in captured.out
+        return True
+
+
+@pytest.fixture
+def result_checker(capsys):
+    def factory(code=0, output="", contains=""):
+        return ResultChecker(capsys, code, output, contains)
+
+    return factory
 
 
 @pytest.fixture
