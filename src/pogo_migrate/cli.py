@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import asyncio
 import contextlib
 import functools
@@ -18,7 +19,6 @@ from typing import ParamSpec
 import dotenv
 import rtoml
 import tabulate
-import typer
 from pogo_core import squash
 from pogo_core.migration import Migration, find_heads, read_sql_migration, topological_sort
 from pogo_core.util import migrate, sql
@@ -31,33 +31,14 @@ from pogo_migrate.util import get_editor, make_file
 tempfile_prefix = "_tmp_pogonew"
 
 
+version = importlib.metadata.version("pogo-migrate")
+
+
 def load_dotenv() -> None:
     dotenv.load_dotenv(
         dotenv.find_dotenv(usecwd=True),
         override=False,
     )
-
-
-def _version_callback(*, value: bool) -> None:
-    """Get current cli version."""
-    if value:  # pragma: no cover
-        version = importlib.metadata.version("pogo-migrate")
-        typer.echo(f"pogo-migrate {version}")
-        raise typer.Exit
-
-
-def _callback(  # pragma: no cover
-    _version: bool | None = typer.Option(  # noqa: FBT001
-        None,
-        "-v",
-        "--version",
-        callback=_version_callback,
-        help="Print version and exit.",
-    ),
-) -> None: ...
-
-
-app: typer.Typer = typer.Typer(name="pogo", callback=_callback)
 
 
 P = ParamSpec("P")
@@ -91,30 +72,23 @@ def handle_exceptions(
             """
             try:
                 return await f(*args, **kwargs)
-            except typer.Exit:
+            except SystemExit:
                 raise
             except Exception as e:
                 context.exception(str(e))
-                raise typer.Exit(code=1) from e
+                raise SystemExit(1) from e
 
         return wrapped
 
     return inner
 
 
-@app.command("init")
 def init(
-    migrations_location: str = typer.Option("./migrations", "-m", "--migrations-location"),
-    database_config: str = typer.Option("{POGO_DATABASE}", "-d", "--database-env-key"),
-    schema: str | None = typer.Option("public", help="Default schema name."),
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    *,
+    migrations_location: str = "./migrations",
+    database_env_key: str = "{POGO_DATABASE}",
+    schema: str = "public",
+    verbose: int = 0,
 ) -> None:
     """Initiate pogo configuration.
 
@@ -135,7 +109,7 @@ def init(
         if "tool" in data and "pogo" in data["tool"]:
             context.error("pogo already configured.")
             context.warn("\n".join(["", "[tool.pogo]"] + [f'{k} = "{v}"' for k, v in data["tool"]["pogo"].items()]))
-            raise typer.Exit(code=1)
+            raise SystemExit(1)
 
         cwd = Path.cwd().absolute()
         p = Path(migrations_location).resolve().absolute()
@@ -144,13 +118,13 @@ def init(
             loc = p.relative_to(cwd)
         except ValueError as e:
             context.error("migrations_location is not a child of current location.")
-            raise typer.Exit(code=1) from e
+            raise SystemExit(1) from e
 
         data = {
             "tool": {
                 "pogo": {
                     "migrations": f"./{loc}",
-                    "database_config": database_config,
+                    "database_config": database_env_key,
                     "schema": schema,
                 },
             },
@@ -158,7 +132,7 @@ def init(
 
         config = rtoml.dumps(data, pretty=True)
         context.error(config)
-        if typer.confirm(f"Write configuration to {pyproject.absolute()}"):
+        if confirm(f"Write configuration to {pyproject.absolute()}"):
             loc.mkdir(exist_ok=True, parents=True)
             with pyproject.open("a") as f:  # noqa: ASYNC230
                 f.write("\n")
@@ -198,12 +172,35 @@ migration_sql_template: str = dedent(
 )
 
 
+def prompt(text: str, default: str | None = None) -> str:
+    rv = None
+    while rv is None:
+        sys.stdout.write(text)
+        value = input(": ")
+        if value or default is not None:
+            rv = value or default
+    return rv.lower()
+
+
+def confirm(text: str, *, default: bool = False) -> bool:
+    rv = None
+    while rv is None:
+        choices = "[Y/n]" if default else "[y/N]"
+        value = prompt(f"{text} {choices}", default="y" if default else "n")
+        if value in {"y", "yes"}:
+            rv = True
+        elif value in {"n", "no"}:
+            rv = False
+
+    return rv
+
+
 def retry(context: Context) -> str:
     choice = ""
     while choice == "":
-        choice = typer.prompt("Retry editing? [Ynqh]", default="y", show_default=False)
+        choice = prompt("Retry editing? [Ynqh]", default="y")
         if choice == "q":
-            raise typer.Exit(code=0)
+            raise SystemExit(0)
         if choice in "yn":
             return choice
         if choice == "h":
@@ -245,11 +242,11 @@ def create_with_editor(config: Config, content: str, extension: str, context: Co
                 subprocess.call(editor)  # noqa: S603
             except OSError as e:
                 context.error("Error: could not open editor!")
-                raise typer.Exit(code=1) from e
+                raise SystemExit(1) from e
             else:
                 if Path(tmpfile.name).lstat().st_mtime == mtime:
                     context.error("Abort: no changes made")
-                    raise typer.Exit(code=1)
+                    raise SystemExit(1)
 
             try:
                 migration = Migration("temporary", Path(tmpfile.name), None)
@@ -272,20 +269,12 @@ def create_with_editor(config: Config, content: str, extension: str, context: Co
             Path(tmpfile.name).unlink()
 
 
-@app.command("new")
 def new(
-    message_: str = typer.Option("", "-m", "--message", help="Message describing focus of the migration."),
     *,
-    interactive: bool = typer.Option(True, help="Open migration for editing."),  # noqa: FBT003
-    py_: bool = typer.Option(False, "--py", help="Generate a python migration."),  # noqa: FBT003
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    message_: str = "",
+    interactive: bool = True,
+    py_: bool = False,
+    verbose: int = 0,
 ) -> None:
     """Generate a new migration."""
     context = Context(verbose)
@@ -310,7 +299,7 @@ def new(
             fp = make_file(config.migrations, message, extension)
             with fp.open("w", encoding="UTF-8") as f:
                 f.write(content)
-            raise typer.Exit(code=0)
+            raise SystemExit(0)
 
         p = create_with_editor(config, content, extension, context)
         context.error("Created file: %s", p.as_posix().replace(config.root_directory.as_posix(), "").lstrip("/"))
@@ -318,21 +307,13 @@ def new(
     asyncio.run(new_())
 
 
-@app.command("history")
 def history(
-    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
-    schema: str | None = typer.Option(None, help="Schema override."),
-    unapplied: bool = typer.Option(False, help="Show only unapplied migrations."),  # noqa: FBT003
-    simple: bool = typer.Option(False, help="Show raw data without tabulation."),  # noqa: FBT003
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    database: str | None = None,
+    schema: str | None = None,
+    unapplied: bool = False,
+    simple: bool = False,
+    verbose: int = 0,
 ) -> None:
     """List migration history.
 
@@ -377,20 +358,12 @@ def history(
     asyncio.run(history_())
 
 
-@app.command("apply")
 def apply(
-    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
-    schema: str | None = typer.Option(None, help="Schema override."),
-    create_schema: bool = typer.Option(False, "--create-schema/ ", help="Create database schema."),  # noqa: FBT003
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    database: str | None = None,
+    schema: str | None = None,
+    create_schema: bool = False,
+    verbose: int = 0,
 ) -> None:
     """Apply migrations."""
     context = Context(verbose)
@@ -409,30 +382,13 @@ def apply(
     asyncio.run(apply_())
 
 
-@app.command("rollback")
 def rollback(
-    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
-    count: int = typer.Option(
-        1,
-        "-c",
-        "--count",
-        help="Number of migrations to rollback",
-    ),
     *,
-    schema: str | None = typer.Option(None, help="Schema override."),
-    drop_schema: bool = typer.Option(
-        False,  # noqa: FBT003
-        "--drop-schema/ ",
-        help="Drop database schema if all migrations rolled back.",
-    ),
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    database: str | None = None,
+    count: int = 1,
+    schema: str | None = None,
+    drop_schema: bool = False,
+    verbose: int = 0,
 ) -> None:
     """Rollback one or more migrations."""
     context = Context(verbose)
@@ -459,27 +415,19 @@ def rollback(
 
             if len(applied_migrations) > 0:
                 context.error("migrations still exist, can't drop schema.")
-                raise typer.Exit(code=1)
+                raise SystemExit(1)
 
             await sql.drop_schema(db, schema_name=schema_name)
 
     asyncio.run(rollback_())
 
 
-@app.command("remove")
 def remove(
-    migration_id: str = typer.Argument(show_default=False, help="Migration id to remove (message can be excluded)."),
-    migrations_location: str | None = typer.Option(None, "-m", "--migrations-location"),
     *,
-    backup: bool = typer.Option(False, "--backup/ ", help="Keep .bak copy of original files."),  # noqa: FBT003
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    migration_id: str,
+    migrations_location: str | None = None,
+    backup: bool = False,
+    verbose: int = 0,
 ) -> None:
     """Remove a migration from the dependency chain."""
     context = Context(verbose)
@@ -503,26 +451,14 @@ def remove(
             squash.remove(migration, next_migration, logger=context, backup=backup)
 
 
-@app.command("squash")
 def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
-    migrations_location: str | None = typer.Option(None, "-m", "--migrations-location"),
     *,
-    backup: bool = typer.Option(False, "--backup/ ", help="Keep .bak copy of original files."),  # noqa: FBT003
-    source: bool = typer.Option(False, "--source/ ", help="Add comment for source migration to each statement."),  # noqa: FBT003
-    prompt_update: bool = typer.Option(False, "--update-prompt/ ", help="Confirm before including UPDATE statements."),  # noqa: FBT003
-    prompt_skip: bool = typer.Option(
-        False,  # noqa: FBT003
-        "--skip-prompt/ ",
-        help="Confirm before skipping unsquashable files, allow removal instead.",
-    ),
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    migrations_location: str | None = None,
+    backup: bool = False,
+    source: bool = False,
+    prompt_update: bool = False,
+    prompt_skip: bool = False,
+    verbose: int = 0,
 ) -> None:
     """Squash migrations [EXPERIMENTAL].
 
@@ -557,12 +493,12 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         skip = migration.id in config.squash.exclude
         if not migration.is_sql or not migration.use_transaction:
             if prompt_skip:
-                view = typer.confirm(f"View unsquashable migration {migration.id}", default=True)
+                view = confirm(f"View unsquashable migration {migration.id}", default=True)
                 if view:
                     content = migration.path.read_text()
                     context.error(content)
 
-                remove = typer.confirm(f"Remove unsquashable migration {migration.id}", default=False)
+                remove = confirm(f"Remove unsquashable migration {migration.id}", default=False)
                 if remove:
                     next_migration = None
                     with contextlib.suppress(IndexError):
@@ -600,7 +536,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
             except squash.ParseError as e:  # pragma: no cover
                 context.exception("%s: %s", migration.id, str(e))
                 context.warn(apply)
-                raise typer.Exit(code=1) from e
+                raise SystemExit(1) from e
 
             if source:
                 parsed.statement = f"{parsed.statement} -- source: {migration.id}"
@@ -611,7 +547,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                 else:
                     context.error("Can not extract table from DDL statement in migration %s", migration.id)
                     context.warn(apply)
-                    raise typer.Exit(code=1)
+                    raise SystemExit(1)
 
             else:
                 keep = True
@@ -623,7 +559,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                     with contextlib.suppress(IndexError):
                         context.error("   %s", apply_statements[i + 1])
                     context.error("")
-                    keep = typer.confirm("Include update statement", default=True)
+                    keep = confirm("Include update statement", default=True)
 
                 if keep:
                     applies["__data"].append(parsed.statement)
@@ -635,7 +571,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
             except squash.ParseError as e:  # pragma: no cover
                 context.exception("%s: %s", migration.id, str(e))
                 context.warn(rollback)
-                raise typer.Exit(code=1) from e
+                raise SystemExit(1) from e
             if source:
                 parsed.statement = f"{parsed.statement} -- source: {migration.id}"
 
@@ -645,7 +581,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                 else:
                     context.error("Can not extract table from DDL statement in migration %s", migration.id)
                     context.warn(rollback)
-                    raise typer.Exit(code=1)
+                    raise SystemExit(1)
             else:
                 context.debug(parsed.statement_type)
                 rollbacks_["__data"].append(parsed.statement)
@@ -671,18 +607,10 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
             new.path.rename(orig.path)
 
 
-@app.command("clean")
 def clean(
-    migrations_location: str | None = typer.Option(None, "-m", "--migrations-location"),
     *,
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    migrations_location: str | None = None,
+    verbose: int = 0,
 ) -> None:
     """Clean the migration directory of .bak migrations from squash."""
     _context = Context(verbose)
@@ -695,18 +623,10 @@ def clean(
             path.unlink()
 
 
-@app.command("validate")
 def validate(
-    migrations_location: str | None = typer.Option(None, "-m", "--migrations-location"),
     *,
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    migrations_location: str | None = None,
+    verbose: int = 0,
 ) -> None:
     """Validate migrations [EXPERIMENTAL].
 
@@ -769,21 +689,13 @@ def validate(
                 context.warn(statement)
 
 
-@app.command("mark")
 def mark(
-    migration_id: str | None = typer.Option(None, "-m", "--migration", help="Specific migration to mark."),
-    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
-    schema: str | None = typer.Option(None, help="Schema override."),
-    interactive: bool = typer.Option(True, help="Confirm all changes."),  # noqa: FBT003
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    migration_id: str | None = None,
+    database: str | None = None,
+    schema: str | None = None,
+    interactive: bool = True,
+    verbose: int = 0,
 ) -> None:
     """Mark migrations as applied, without running.
 
@@ -807,7 +719,7 @@ def mark(
             for migration in migrations:
                 migration.load()
                 if not migration.applied:
-                    if interactive and not typer.confirm(f"Mark {migration.id} as applied?"):
+                    if interactive and not confirm(f"Mark {migration.id} as applied?"):
                         break
 
                     await sql.migration_applied(db, migration.id, migration.hash, schema_name=schema_name)
@@ -815,20 +727,12 @@ def mark(
     asyncio.run(_mark())
 
 
-@app.command("unmark")
 def unmark(
-    migration_id: str | None = typer.Option(None, "-m", "--migration", help="Specific migration to mark."),
-    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
-    schema: str | None = typer.Option(None, help="Schema override."),
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    migration_id: str | None = None,
+    database: str | None = None,
+    schema: str | None = None,
+    verbose: int = 0,
 ) -> None:
     """Mark migrations as unapplied, without rolling back.
 
@@ -854,7 +758,7 @@ def unmark(
             for migration in migrations:
                 migration.load()
                 if migration.applied:
-                    if not typer.confirm(f"Unmark {migration.id} as applied?"):
+                    if not confirm(f"Unmark {migration.id} as applied?"):
                         break
 
                     await sql.migration_unapplied(db, migration.id, schema_name=schema_name)
@@ -862,19 +766,11 @@ def unmark(
     asyncio.run(_unmark())
 
 
-@app.command("migrate-yoyo")
 def migrate_yoyo(
-    database: str | None = typer.Option(None, "-d", "--database", help="Database connection string."),
     *,
-    skip_files: bool = typer.Option(False, help="Skip file migration, just copy yoyo history."),  # noqa: FBT003
-    verbose: int = typer.Option(
-        0,
-        "-v",
-        "--verbose",
-        help="Verbose output. Use multiple times to increase level of verbosity.",
-        count=True,
-        max=3,
-    ),
+    database: str | None = None,
+    skip_files: bool = False,
+    verbose: int = 0,
 ) -> None:
     """Migrate existing 'yoyo' migrations to 'pogo'."""
     context = Context(verbose)
@@ -911,3 +807,291 @@ def migrate_yoyo(
         await yoyo.copy_yoyo_migration_history(context, db)
 
     asyncio.run(_migrate())
+
+
+class HelpFormatter(argparse.HelpFormatter):
+    def _get_help_string(self, action: argparse.Action) -> str | None:
+        help_ = action.help
+        if help_ and action.default is not argparse.SUPPRESS:
+            help_ += f" (default: {action.default})"
+        return help_
+
+
+# Build argparser
+
+parser = argparse.ArgumentParser(prog="pogo", usage="pogo [OPTIONS] COMMAND [ARGS]...", formatter_class=HelpFormatter)
+parser.add_argument("--version", action="version", version=f"pogo-migrate {version}")
+
+parent_parser = argparse.ArgumentParser(add_help=False)
+parent_parser.add_argument(
+    "-v",
+    "--verbose",
+    help="Verbose output. Use multiple times to increase level of verbosity.",
+    action="count",
+    default=0,
+)
+
+commands = parser.add_subparsers(title="commands", dest="command")
+
+# Create command parsers
+_init = commands.add_parser(
+    "init",
+    parents=[parent_parser],
+    help="Initiate pogo configuration.",
+    formatter_class=HelpFormatter,
+)
+_new = commands.add_parser(
+    "new",
+    help="Generate a new migration.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_history = commands.add_parser(
+    "history",
+    help="List migration history.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_apply = commands.add_parser("apply", help="Apply migrations.", parents=[parent_parser], formatter_class=HelpFormatter)
+_rollback = commands.add_parser(
+    "rollback",
+    help="Rollback one or more migrations.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_remove = commands.add_parser(
+    "remove",
+    help="Remove a migration from the dependency chain.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_squash = commands.add_parser(
+    "squash",
+    help="Squash migrations [EXPERIMENTAL].",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_clean = commands.add_parser(
+    "clean",
+    help="Clean the migration directory of .bak migrations from squash.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_validate = commands.add_parser(
+    "validate",
+    help="Validate migrations [EXPERIMENTAL].",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_mark = commands.add_parser(
+    "mark",
+    help="Mark migrations as applied, without running.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_unmark = commands.add_parser(
+    "unmark",
+    help="Mark migrations as unapplied, without rolling back.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+_yoyo = commands.add_parser(
+    "migrate-yoyo",
+    help="Migrate existing 'yoyo' migrations to 'pogo'.",
+    parents=[parent_parser],
+    formatter_class=HelpFormatter,
+)
+
+# Generate command arguments
+_init.add_argument("-m", "--migrations-location", default="./migrations")
+_init.add_argument("-d", "--database-env-key", default="{POGO_DATABASE}")
+_init.add_argument("--schema", help="Default schema name.", default="public")
+
+_new.add_argument(
+    "-m",
+    "--message",
+    help="Message describing focus of the migration.",
+    default="",
+    dest="message_",
+)
+_new.add_argument(
+    "--interactive",
+    action=argparse.BooleanOptionalAction,
+    help="Open migration for editing.",
+    default=True,
+)
+_new.add_argument(
+    "--py",
+    action=argparse.BooleanOptionalAction,
+    help="Generate a python migration",
+    default=False,
+    dest="py_",
+)
+
+_history.add_argument(
+    "-d",
+    "--database",
+    help="Database connection string.",
+)
+_history.add_argument(
+    "--schema",
+    help="Schema override.",
+)
+_history.add_argument(
+    "--unapplied",
+    action="store_true",
+    help="Show only unapplied migrations.",
+)
+_history.add_argument(
+    "--simple",
+    action="store_true",
+    help="Show raw data without tabulation.",
+)
+
+_apply.add_argument(
+    "-d",
+    "--database",
+    help="Database connection string.",
+)
+_apply.add_argument(
+    "--schema",
+    help="Schema override.",
+)
+_apply.add_argument(
+    "--create-schema",
+    action="store_true",
+    help="Create database schema.",
+)
+
+_rollback.add_argument(
+    "-d",
+    "--database",
+    help="Database connection string.",
+)
+_rollback.add_argument(
+    "-c",
+    "--count",
+    help="Number of migrations to rollback.",
+    default=1,
+    type=int,
+)
+_rollback.add_argument(
+    "--schema",
+    help="Schema override.",
+)
+_rollback.add_argument(
+    "--drop-schema",
+    action="store_true",
+    help="Drop database schema if all migrations rolled back.",
+)
+
+_remove.add_argument(
+    "migration_id",
+    help="Migration id to remove (message can be excluded).",
+)
+_remove.add_argument("-m", "--migrations-location")
+_remove.add_argument(
+    "--backup",
+    action="store_true",
+    help="Keep .bak copy of original files.",
+)
+
+_squash.add_argument("-m", "--migrations-location")
+_squash.add_argument(
+    "--backup",
+    action="store_true",
+    help="Keep .bak copy of original files.",
+)
+_squash.add_argument(
+    "--source",
+    action="store_true",
+    help="Add comment for source migration to each statement.",
+)
+_squash.add_argument(
+    "--update-prompt",
+    action="store_true",
+    help="Confirm before including UPDATE statements.",
+    dest="prompt_update",
+)
+_squash.add_argument(
+    "--skip-prompt",
+    action="store_true",
+    help="Confirm before skipping unsquashable files, allow removal instead.",
+    dest="prompt_skip",
+)
+
+_clean.add_argument("-m", "--migrations-location")
+
+_validate.add_argument("-m", "--migrations-location")
+
+_mark.add_argument(
+    "-m",
+    "--migration",
+    help="Specific migration to mark.",
+    dest="migration_id",
+)
+_mark.add_argument(
+    "-d",
+    "--database",
+    help="Database connection string.",
+)
+_mark.add_argument(
+    "--schema",
+    help="Schema override.",
+)
+_mark.add_argument(
+    "--interactive",
+    action=argparse.BooleanOptionalAction,
+    help="Confirm all changes.",
+    default=True,
+)
+
+_unmark.add_argument(
+    "-m",
+    "--migration",
+    help="Specific migration to unmark.",
+    dest="migration_id",
+)
+_unmark.add_argument(
+    "-d",
+    "--database",
+    help="Database connection string.",
+)
+_unmark.add_argument(
+    "--schema",
+    help="Schema override.",
+)
+
+_yoyo.add_argument(
+    "-d",
+    "--database",
+    help="Database connection string.",
+)
+_yoyo.add_argument(
+    "--skip-files",
+    action=argparse.BooleanOptionalAction,
+    help="Skip file migration, just copy yoyo history.",
+    default=False,
+)
+
+# Assign command functions
+_init.set_defaults(func=init)
+_new.set_defaults(func=new)
+_history.set_defaults(func=history)
+_apply.set_defaults(func=apply)
+_rollback.set_defaults(func=rollback)
+_remove.set_defaults(func=remove)
+_squash.set_defaults(func=squash_)
+_clean.set_defaults(func=clean)
+_validate.set_defaults(func=validate)
+_mark.set_defaults(func=mark)
+_unmark.set_defaults(func=unmark)
+_yoyo.set_defaults(func=migrate_yoyo)
+
+
+def main() -> None:
+    """Bump package version."""
+    args = parser.parse_args()
+    kwargs = {k: v for k, v in vars(args).items() if k not in {"command", "func"}}
+    args.func(**kwargs)
+    raise SystemExit(0)

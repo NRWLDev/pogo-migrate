@@ -1,12 +1,16 @@
+import collections.abc as cabc
+import io
 import os
 import pathlib
 import re
+import sys
 import textwrap
+from typing import Any, BinaryIO, NamedTuple, TextIO
 
 import asyncpg
 import pytest
 import rtoml
-import typer.testing
+from click.testing import _NamedTextIOWrapper
 from pogo_core.migration import Migration
 from pogo_core.util import sql
 
@@ -116,20 +120,75 @@ def context():
     return Context(0)
 
 
-class CliRunner(typer.testing.CliRunner):
-    target = pogo_migrate.cli.app
-    result = None
+class Result(NamedTuple):
+    exit_code: int
+    output: str
 
-    def invoke(self, *args, **kwargs):
-        result = super().invoke(self.target, *args, **kwargs)
+
+class EchoingStdin:
+    def __init__(self, stdin: BinaryIO, stdout: TextIO) -> None:
+        self._input = stdin
+        self._output = stdout
+
+    def __getattr__(self, x: str) -> Any:
+        return getattr(self._input, x)
+
+    def _echo(self, rv: bytes) -> bytes:
+        self._output.write(rv.decode())
+
+        return rv
+
+    def read(self, n: int = -1) -> bytes:
+        return self._echo(self._input.read(n))
+
+    def read1(self, n: int = -1) -> bytes:
+        return self._echo(self._input.read1(n))
+
+    def readline(self, n: int = -1) -> bytes:
+        return self._echo(self._input.readline(n))
+
+    def readlines(self) -> list[bytes]:
+        return [self._echo(x) for x in self._input.readlines()]
+
+    def __iter__(self) -> cabc.Iterator[bytes]:
+        return iter(self._echo(x) for x in self._input)
+
+    def __repr__(self) -> str:
+        return repr(self._input)
+
+
+class CliRunner:
+    def __init__(self, capsys, monkeypatch):
+        self.capsys = capsys
+        self.mp = monkeypatch
+
+    def invoke(self, args, stdin=None):
+        self.mp.setattr(sys, "argv", ["pogo", *args])
+        if stdin:
+            stdin = stdin.encode("utf-8")
+            stdin = io.BytesIO(stdin)
+
+            bytes_input = EchoingStdin(stdin, sys.stdout)
+
+            text_input = _NamedTextIOWrapper(
+                bytes_input,
+                encoding="utf-8",
+                name="<stdin>",
+                mode="r",
+            )
+
+            # Force unbuffered reads, otherwise TextIOWrapper reads a
+            # large chunk which is echoed early.
+            text_input._CHUNK_SIZE = 1
+
+            self.mp.setattr(sys, "stdin", text_input)
+
+        with pytest.raises(SystemExit) as e:
+            pogo_migrate.cli.main()
+        captured = self.capsys.readouterr()
+        result = Result(int(str(e.value)), captured.out)
         self.result = result
-        if result.exception:
-            if isinstance(result.exception, SystemExit):
-                # The error is already properly handled. Print it and return.
-                print(result.output)  # noqa: T201
-            else:
-                raise result.exception.with_traceback(result.exc_info[2])
-        return self.result
+        return result
 
     def _clean_output(self, text: str):
         output = text.encode("ascii", errors="ignore").decode()
@@ -141,5 +200,5 @@ class CliRunner(typer.testing.CliRunner):
 
 
 @pytest.fixture
-def cli_runner():
-    return CliRunner()
+def cli_runner(capsys, monkeypatch):
+    return CliRunner(capsys, monkeypatch)

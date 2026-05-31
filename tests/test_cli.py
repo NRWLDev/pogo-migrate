@@ -1,5 +1,7 @@
 import asyncio
 import importlib.metadata
+import io
+import sys
 from pathlib import Path
 from textwrap import dedent
 from unittest import mock
@@ -49,9 +51,40 @@ def _db_patch(db_session, monkeypatch):
     monkeypatch.setattr(sql.asyncpg, "connect", AsyncMock(return_value=db_session))
 
 
+class TestHelpers:
+    @pytest.mark.parametrize(
+        ("default", "stdin", "expected"),
+        [
+            (None, "\ny\n", "y"),
+            ("y", "\n", "y"),
+            (None, "Y\n", "y"),
+        ],
+    )
+    def test_prompt(self, default, stdin, expected, monkeypatch):
+        monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
+        choice = cli.prompt("blah", default=default)
+        assert choice == expected
+
+    @pytest.mark.parametrize(
+        ("default", "stdin", "expected"),
+        [
+            (True, "\n", True),
+            (False, "\n", False),
+            (False, "ok\ny\n", True),
+            (False, "ok\nyes\n", True),
+            (False, "sure\nno\n", False),
+            (False, "sure\nn\n", False),
+        ],
+    )
+    def test_confirm(self, default, stdin, expected, monkeypatch):
+        monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
+        choice = cli.confirm("blah", default=default)
+        assert choice == expected
+
+
 class TestInit:
     def test_init_no_confirm(self, cwd, cli_runner):
-        result = cli_runner.invoke(["init"], input="n\n")
+        result = cli_runner.invoke(["init"], stdin="n\n")
         assert result.exit_code == 0, result.output
 
         p = cwd / "pyproject.toml"
@@ -59,7 +92,7 @@ class TestInit:
             assert f.read() == ""
 
     def test_init_no_pyproject(self, cwd, cli_runner):
-        result = cli_runner.invoke(["init"], input="y\n")
+        result = cli_runner.invoke(["init"], stdin="y\n")
         assert result.exit_code == 0, result.output
 
         p = cwd / "pyproject.toml"
@@ -88,7 +121,7 @@ class TestInit:
             key = "value"
             """),
             )
-        result = cli_runner.invoke(["init"], input="y\n")
+        result = cli_runner.invoke(["init"], stdin="y\n")
         assert result.exit_code == 0, result.output
 
         with p.open() as f:
@@ -105,7 +138,7 @@ class TestInit:
     def test_init_overrides(self, cwd, cli_runner):
         result = cli_runner.invoke(
             ["init", "-m", "./my-migrations", "-d", "{POSTGRES_DSN}", "--schema", "pogo"],
-            input="y\n",
+            stdin="y\n",
         )
         assert result.exit_code == 0, result.output
 
@@ -487,7 +520,7 @@ class TestNew:
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
         monkeypatch.setattr(cli.Migration, "load", mock.Mock(side_effect=Exception))
 
-        result = cli_runner.invoke(["new"], input="q\n")
+        result = cli_runner.invoke(["new"], stdin="q\n")
 
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
@@ -503,7 +536,7 @@ class TestNew:
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
         monkeypatch.setattr(cli.Migration, "load", mock.Mock(side_effect=Exception))
 
-        result = cli_runner.invoke(["new"], input="a\nb\nq\n")
+        result = cli_runner.invoke(["new"], stdin="a\nb\nq\n")
 
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
@@ -521,7 +554,7 @@ class TestNew:
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock()]))
         monkeypatch.setattr(cli.Migration, "load", mock.Mock(side_effect=Exception))
 
-        result = cli_runner.invoke(["new"], input="h\nq\n")
+        result = cli_runner.invoke(["new"], stdin="h\nq\n")
 
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
@@ -544,7 +577,7 @@ class TestNew:
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock(), mock.Mock()]))
         monkeypatch.setattr(cli.Migration, "load", mock.Mock(side_effect=Exception))
 
-        result = cli_runner.invoke(["new"], input="y\nn\n")
+        result = cli_runner.invoke(["new"], stdin="y\nn\n")
 
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
@@ -564,7 +597,7 @@ class TestNew:
         monkeypatch.setattr(cli.Path, "lstat", mock.Mock(side_effect=[mock.Mock(), mock.Mock(), mock.Mock()]))
         monkeypatch.setattr(cli.Migration, "load", mock.Mock(side_effect=Exception))
 
-        result = cli_runner.invoke(["new"], input="\nn\n")
+        result = cli_runner.invoke(["new"], stdin="\nn\n")
 
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
@@ -1607,7 +1640,7 @@ class TestMark:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["mark"], input="y\nn\n")
+        result = cli_runner.invoke(["mark"], stdin="y\nn\n")
         assert result.exit_code == 1, result.output
         cli_runner.assert_output(
             dedent("""\
@@ -1657,7 +1690,7 @@ class TestMark:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["mark", "--database", postgres_dsn], input="y\nn\n")
+        result = cli_runner.invoke(["mark", "--database", postgres_dsn], stdin="y\nn\n")
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
@@ -1704,7 +1737,7 @@ class TestMark:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["mark"], input="y\nn\n")
+        result = cli_runner.invoke(["mark"], stdin="y\nn\n")
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
@@ -1751,7 +1784,7 @@ class TestMark:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["mark", "-m", "20210101_02_rando-commit"], input="y\n")
+        result = cli_runner.invoke(["mark", "-m", "20210101_02_rando-commit"], stdin="y\n")
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
@@ -1856,7 +1889,7 @@ class TestUnMark:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["unmark"], input="y\nn\n")
+        result = cli_runner.invoke(["unmark"], stdin="y\nn\n")
         assert result.exit_code == 1, result.output
         cli_runner.assert_output(
             dedent("""\
@@ -1907,7 +1940,7 @@ class TestUnMark:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["unmark", "--database", postgres_dsn], input="y\nn\n")
+        result = cli_runner.invoke(["unmark", "--database", postgres_dsn], stdin="y\nn\n")
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
@@ -1955,7 +1988,7 @@ class TestUnMark:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["unmark"], input="y\nn\n")
+        result = cli_runner.invoke(["unmark"], stdin="y\nn\n")
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
@@ -2003,7 +2036,7 @@ class TestUnMark:
             -- migrate: rollback
             """),
         )
-        result = cli_runner.invoke(["unmark", "-m", "20210101_02_rando-commit"], input="y\n")
+        result = cli_runner.invoke(["unmark", "-m", "20210101_02_rando-commit"], stdin="y\n")
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent("""\
@@ -2449,7 +2482,7 @@ class TestSquash:
             """),
         )
 
-        result = cli_runner.invoke(["squash", "--update-prompt"], input="\nn\n")
+        result = cli_runner.invoke(["squash", "--update-prompt"], stdin="\nn\n")
         assert result.exit_code == 0, result.output
 
         assert new.read_text() == dedent("""\
@@ -2720,7 +2753,7 @@ class TestSquash:
             '''),
         )
 
-        result = cli_runner.invoke(["squash", "--skip-prompt"], input="y\ny\n")
+        result = cli_runner.invoke(["squash", "--skip-prompt"], stdin="y\ny\n")
         assert result.exit_code == 0, result.output
         cli_runner.assert_output(
             dedent('''\
@@ -2764,7 +2797,7 @@ class TestSquash:
             '''),
         )
 
-        result = cli_runner.invoke(["squash", "--skip-prompt"], input="n\nn\n")
+        result = cli_runner.invoke(["squash", "--skip-prompt"], stdin="n\nn\n")
         assert result.exit_code == 0, result.output
 
         assert sorted([path.stem for path in migrations.iterdir() if path.suffix in {".py", ".sql"}]) == [
