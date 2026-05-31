@@ -1,15 +1,16 @@
+import collections.abc as cabc
 import io
 import os
 import pathlib
 import re
 import sys
 import textwrap
-from typing import NamedTuple
+from typing import Any, BinaryIO, NamedTuple, TextIO
 
 import asyncpg
 import pytest
 import rtoml
-from click.testing import EchoingStdin, _NamedTextIOWrapper
+from click.testing import _NamedTextIOWrapper
 from pogo_core.migration import Migration
 from pogo_core.util import sql
 
@@ -122,6 +123,38 @@ def context():
 class Result(NamedTuple):
     exit_code: int
     output: str
+
+
+class EchoingStdin:
+    def __init__(self, stdin: BinaryIO, stdout: TextIO) -> None:
+        self._input = stdin
+        self._output = stdout
+
+    def __getattr__(self, x: str) -> Any:
+        return getattr(self._input, x)
+
+    def _echo(self, rv: bytes) -> bytes:
+        self._output.write(rv.decode())
+
+        return rv
+
+    def read(self, n: int = -1) -> bytes:
+        return self._echo(self._input.read(n))
+
+    def read1(self, n: int = -1) -> bytes:
+        return self._echo(self._input.read1(n))
+
+    def readline(self, n: int = -1) -> bytes:
+        return self._echo(self._input.readline(n))
+
+    def readlines(self) -> list[bytes]:
+        return [self._echo(x) for x in self._input.readlines()]
+
+    def __iter__(self) -> cabc.Iterator[bytes]:
+        return iter(self._echo(x) for x in self._input)
+
+    def __repr__(self) -> str:
+        return repr(self._input)
 
 
 class CliRunner:
