@@ -53,3 +53,11 @@ def infra_test_stop(context):
     context.run(
         "docker compose -f unittest-compose.yml down",
     )
+
+
+@invoke.task
+def bump(context):
+    context.run("git-cliff --config pyproject.toml --bump -o CHANGELOG.md")
+    result = context.run("git-cliff --bumped-version")
+    x = result.stdout.splitlines()[0].lstrip("v")
+    context.run(f"bumpversion {x}")

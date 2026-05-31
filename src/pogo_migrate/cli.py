@@ -19,7 +19,6 @@ from typing import ParamSpec
 import dotenv
 import rtoml
 import tabulate
-import typer
 from pogo_core import squash
 from pogo_core.migration import Migration, find_heads, read_sql_migration, topological_sort
 from pogo_core.util import migrate, sql
@@ -133,7 +132,7 @@ def init(
 
         config = rtoml.dumps(data, pretty=True)
         context.error(config)
-        if typer.confirm(f"Write configuration to {pyproject.absolute()}"):
+        if confirm(f"Write configuration to {pyproject.absolute()}"):
             loc.mkdir(exist_ok=True, parents=True)
             with pyproject.open("a") as f:  # noqa: ASYNC230
                 f.write("\n")
@@ -173,10 +172,33 @@ migration_sql_template: str = dedent(
 )
 
 
+def prompt(text: str, default: str | None = None) -> str:
+    rv = None
+    while rv is None:
+        sys.stdout.write(text)
+        value = input(": ")
+        if value or default is not None:
+            rv = value or default
+    return rv.lower()
+
+
+def confirm(text: str, *, default: bool = False) -> bool:
+    rv = None
+    while rv is None:
+        choices = "[Y/n]" if default else "[y/N]"
+        value = prompt(f"{text} {choices}", default="y" if default else "n")
+        if value in {"y", "yes"}:
+            rv = True
+        elif value in {"n", "no"}:
+            rv = False
+
+    return rv
+
+
 def retry(context: Context) -> str:
     choice = ""
     while choice == "":
-        choice = typer.prompt("Retry editing? [Ynqh]", default="y", show_default=False)
+        choice = prompt("Retry editing? [Ynqh]", default="y")
         if choice == "q":
             raise SystemExit(0)
         if choice in "yn":
@@ -471,12 +493,12 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
         skip = migration.id in config.squash.exclude
         if not migration.is_sql or not migration.use_transaction:
             if prompt_skip:
-                view = typer.confirm(f"View unsquashable migration {migration.id}", default=True)
+                view = confirm(f"View unsquashable migration {migration.id}", default=True)
                 if view:
                     content = migration.path.read_text()
                     context.error(content)
 
-                remove = typer.confirm(f"Remove unsquashable migration {migration.id}", default=False)
+                remove = confirm(f"Remove unsquashable migration {migration.id}", default=False)
                 if remove:
                     next_migration = None
                     with contextlib.suppress(IndexError):
@@ -537,7 +559,7 @@ def squash_(  # noqa: C901, PLR0912, PLR0915, PLR0913
                     with contextlib.suppress(IndexError):
                         context.error("   %s", apply_statements[i + 1])
                     context.error("")
-                    keep = typer.confirm("Include update statement", default=True)
+                    keep = confirm("Include update statement", default=True)
 
                 if keep:
                     applies["__data"].append(parsed.statement)
@@ -697,7 +719,7 @@ def mark(
             for migration in migrations:
                 migration.load()
                 if not migration.applied:
-                    if interactive and not typer.confirm(f"Mark {migration.id} as applied?"):
+                    if interactive and not confirm(f"Mark {migration.id} as applied?"):
                         break
 
                     await sql.migration_applied(db, migration.id, migration.hash, schema_name=schema_name)
@@ -736,7 +758,7 @@ def unmark(
             for migration in migrations:
                 migration.load()
                 if migration.applied:
-                    if not typer.confirm(f"Unmark {migration.id} as applied?"):
+                    if not confirm(f"Unmark {migration.id} as applied?"):
                         break
 
                     await sql.migration_unapplied(db, migration.id, schema_name=schema_name)
