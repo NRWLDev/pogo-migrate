@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.6 - 2026-06-01
+
+### Bug fixes
+
+- Drop click and a test dependency and remove all references [[64450a8](https://github.com/NRWLDev/pogo/commit/64450a81c847982261de5a817dfab04a47577d32)]
+
 ## v0.4.5 - 2026-05-31
 
 ### Miscellaneous
