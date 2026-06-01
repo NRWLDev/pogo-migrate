@@ -10,7 +10,6 @@ from typing import Any, BinaryIO, NamedTuple, TextIO
 import asyncpg
 import pytest
 import rtoml
-from click.testing import _NamedTextIOWrapper
 from pogo_core.migration import Migration
 from pogo_core.util import sql
 
@@ -170,11 +169,9 @@ class CliRunner:
 
             bytes_input = EchoingStdin(stdin, sys.stdout)
 
-            text_input = _NamedTextIOWrapper(
+            text_input = io.TextIOWrapper(
                 bytes_input,
                 encoding="utf-8",
-                name="<stdin>",
-                mode="r",
             )
 
             # Force unbuffered reads, otherwise TextIOWrapper reads a

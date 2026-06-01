@@ -8,8 +8,6 @@ import typing as t
 from dataclasses import dataclass, field
 from enum import IntEnum
 
-import click
-
 
 class Verbosity(IntEnum):
     """Verbosity levels."""
@@ -59,7 +57,7 @@ class Context:
     def _echo(self, message: str, *args: P.args, **kwargs: P.kwargs) -> None:  # noqa: ARG002
         """Echo to the console."""
         message = message % args
-        click.echo(f"{'  ' * self._indent}{message}")
+        sys.stdout.write(f"{'  ' * self._indent}{message}\n")
 
     def error(self, msg: str, *args: P.args, **kwargs: P.kwargs) -> t.Any:  # noqa: ANN401
         """Echo to the console."""

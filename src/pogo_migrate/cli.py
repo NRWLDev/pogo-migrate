@@ -1087,7 +1087,7 @@ for parser_, func in [
     (_validate, validate),
     (_mark, mark),
     (_unmark, unmark),
-    (_yoyo, yoyo),
+    (_yoyo, migrate_yoyo),
 ]:
     parser_.set_defaults(func=func)
     parser_.description = func.__doc__
