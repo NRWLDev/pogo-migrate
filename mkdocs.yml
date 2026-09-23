@@ -9,6 +9,7 @@ nav:
   - usage.md
   - configuration.md
   - testing.md
+  - plugins.md
   - thanks.md
 theme:
   name: material
