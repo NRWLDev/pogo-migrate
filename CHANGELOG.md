@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.7 - 2026-09-23
+
+### Features and Improvements
+
+- Adopt plugin architecture in apply/rollback/history functions and expand documentation. [[ea29753](https://github.com/NRWLDev/pogo/commit/ea2975325563513844bd893369691c7184aa04da)]
+
 ## v0.4.6 - 2026-06-01
 
 ### Bug fixes
