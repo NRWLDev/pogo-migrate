@@ -11,14 +11,14 @@ import invoke  # type: ignore[unresolved-import]
 @invoke.task
 def install(context):
     """Install production requirements."""
-    context.run("uv sync")
+    context.run("uv sync --no-dev")
 
 
 @invoke.task
 def install_dev(context):
     """Install development requirements."""
-    context.run("uv sync --all-extras")
-    context.run("uv run pre-commit install")
+    context.run("uv sync")
+    context.run("uv run prek install")
 
 
 @invoke.task

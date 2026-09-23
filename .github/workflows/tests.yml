@@ -42,7 +42,7 @@ jobs:
       uses: astral-sh/setup-uv@v2
 
     - name: Install dependencies
-      run: uv sync --all-extras
+      run: uv sync
 
     - name: Generate coverage report
       env:
@@ -88,7 +88,7 @@ jobs:
       uses: astral-sh/setup-uv@v2
 
     - name: Install dependencies
-      run: uv sync --all-extras
+      run: uv sync
 
     - name: Test with pytest
       env:

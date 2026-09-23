@@ -9,6 +9,7 @@ variables, or you can provide a database connection directly.
 import asyncpg
 import pogo_migrate.testing
 
+
 @pytest.fixture(scope="session")
 async def _engine(config):  # noqa: PT005
     db = await asyncpg.connect(config.my_postgres_dsn)

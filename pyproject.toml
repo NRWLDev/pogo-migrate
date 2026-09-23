@@ -30,7 +30,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "pogo-core >= 0.1.2",
+    "pogo-core >= 0.1.6",
     "rtoml >= 0.10",
     "sqlparse >= 0.5.2",
     "tabulate >= 0.9.0",
@@ -38,11 +38,7 @@ dependencies = [
     "sqlglot >= 25.19",
 ]
 
-[project.urls]
-homepage = "https://github.com/NRWLDev/pogo-migrate"
-documentation = "https://nrwldev.github.io/pogo-migrate/"
-
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     # Tests
     "asyncpg >= 0.31.0",
@@ -52,16 +48,18 @@ dev = [
     "pytest-random-order >= 1.2.0",
     "pytest-cov >= 7.0.0",
     "pytest-env >= 0.8.1",
-
     # Style
     "ruff >= 0.14.10",
-    "pre-commit >= 3.7.1",
+    "prek>=0.5.3",
     "ty >= 0.0.17",
-
     # release
     "git-cliff>=2.12.0",
     "bumpversion-slim>=0.1.0",
 ]
+
+[project.urls]
+homepage = "https://github.com/NRWLDev/pogo-migrate"
+documentation = "https://nrwldev.github.io/pogo-migrate/"
 
 [project.scripts]
 pogo = "pogo_migrate.cli:main"
@@ -167,6 +165,7 @@ output-format = "concise"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
+    "CPY",
     "D",
     "FIX",
     "TD003",
@@ -178,16 +177,11 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tasks.py" = ["ANN", "E501", "INP001", "S"]
 "src/pogo_migrate/cli.py" = ["UP007", "B008"]
-"tests/*" = ["ANN", "D", "S105", "S106", "SLF", "DTZ005", "S101", "S608", "TD", "PLR0913"]
+"tests/*" = ["ANN", "D", "S105", "S106", "SLF", "DTZ005", "S101", "S608", "TD", "PLR0913", "PLR0917"]
 
 [tool.ruff.format]
 line-ending = "lf"
 quote-style = "double"
-
-[tool.uv]
-dev-dependencies = [
-    "pyright>=1.1.384",
-]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"

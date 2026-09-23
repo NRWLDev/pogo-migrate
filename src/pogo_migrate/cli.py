@@ -337,20 +337,27 @@ def history(
         if db is None:
             context.warn("Database connection can not be established, migration status can not be determined.")
 
-        migrations = await sql.read_migrations(config.migrations, db, schema_name=schema_name)
+        migrations = await sql.read_migrations(config.migrations, db, schema_name=schema_name, include_plugins=True)
         migrations = topological_sort([m.load() for m in migrations])
 
-        data = (
+        data = [
             (
                 "A" if m.applied else "U",
                 m.id,
                 "sql" if m.is_sql else "py",
+                m.plugin,
             )
             for m in migrations
             if not unapplied or (unapplied and not m.applied)
-        )
+        ]
+        has_plugins = any(d[-1] != "" for d in data)
+        headers = ("STATUS", "ID", "FORMAT", "PLUGIN")
+        if not has_plugins:
+            data = [d[:-1] for d in data]
+            headers = headers[:-1]
+
         if not simple:
-            context.error(tabulate.tabulate(data, headers=("STATUS", "ID", "FORMAT")))
+            context.error(tabulate.tabulate(data, headers=headers))
         else:
             for d in data:
                 context.error(" ".join(d))
@@ -377,7 +384,7 @@ def apply(
         schema_name = schema or config.schema
         db = await sql.get_connection(connection_string, schema_name=schema_name, schema_create=create_schema)
 
-        await migrate.apply(db, config.migrations, schema_name=schema_name, logger=context)
+        await migrate.apply(db, config.migrations, schema_name=schema_name, logger=context, include_plugins=True)
 
     asyncio.run(apply_())
 
@@ -408,6 +415,7 @@ def rollback(
             logger=context,
             count=count if count > 0 else None,
             schema_name=schema_name,
+            include_plugins=True,
         )
 
         if drop_schema:
@@ -712,7 +720,7 @@ def mark(
         schema_name = schema or config.schema
         db = await sql.get_connection(connection_string, schema_name=schema_name)
 
-        migrations = await sql.read_migrations(config.migrations, db, schema_name=schema_name)
+        migrations = await sql.read_migrations(config.migrations, db, schema_name=schema_name, include_plugins=True)
         migrations = topological_sort([m.load() for m in migrations if migration_id is None or m.id == migration_id])
 
         async with db.transaction():
@@ -749,7 +757,7 @@ def unmark(
         schema_name = schema or config.schema
         db = await sql.get_connection(connection_string, schema_name=schema_name)
 
-        migrations = await sql.read_migrations(config.migrations, db, schema_name=schema_name)
+        migrations = await sql.read_migrations(config.migrations, db, schema_name=schema_name, include_plugins=True)
         migrations = reversed(
             topological_sort([m.load() for m in migrations if migration_id is None or m.id == migration_id]),
         )
@@ -1097,5 +1105,8 @@ def main() -> None:
     """Bump package version."""
     args = parser.parse_args()
     kwargs = {k: v for k, v in vars(args).items() if k not in {"command", "func"}}
-    args.func(**kwargs)
+    if args.command is not None:
+        args.func(**kwargs)
+    else:
+        parser.print_help()
     raise SystemExit(0)
