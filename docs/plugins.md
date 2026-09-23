@@ -55,3 +55,4 @@ conn = await sql.get_connection(database_dsn)
 
 await migrate.apply(db=conn, migrations_dir=migrations_dir, include_plugins=True)
 await migrate.rollback(db=conn, migrations_dir=migrations_dir, include_plugins=True)
+```
