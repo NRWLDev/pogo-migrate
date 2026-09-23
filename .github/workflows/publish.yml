@@ -23,6 +23,7 @@ jobs:
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_PUBLISH_TOKEN }}
+        UV_PUBLISH_TOKEN: ${{ secrets.PYPI_PUBLISH_TOKEN }}
       run: |
         uv build
-        uvx twine upload dist/*
+        uv publish
